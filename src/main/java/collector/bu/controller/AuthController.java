@@ -9,6 +9,7 @@ import collector.bu.controller.model.UserResponse;
 import collector.bu.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
@@ -16,8 +17,12 @@ import org.springframework.security.web.authentication.session.SessionAuthentica
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 
 @RestController
+@RequestMapping(value = "/api/auth", produces = MediaType.APPLICATION_JSON_VALUE)
 public class AuthController implements AuthApi {
     private final AuthService authService;
     private final HttpServletRequest request;
@@ -35,18 +40,21 @@ public class AuthController implements AuthApi {
     }
 
     @Override
+    @GetMapping("/csrf")
     public ResponseEntity<CsrfResponse> getCsrf() {
         var csrf = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
         return ResponseEntity.ok(new CsrfResponse(csrf.getToken(), csrf.getHeaderName(), csrf.getParameterName()));
     }
 
     @Override
+    @PostMapping(value = "/register", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<UserResponse> register(String csrfToken, RegisterRequest body) {
         authService.register(body.getUsername(), body.getPassword(), body.getConfirmPassword());
         return ResponseEntity.status(201).body(new UserResponse(body.getUsername(), Role.USER));
     }
 
     @Override
+    @PostMapping(value = "/login", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<UserResponse> login(String csrfToken, LoginRequest body) {
         var authentication = authService.login(body.getUsername(), body.getPassword());
         sessions.onAuthentication(authentication, request, response);
@@ -58,6 +66,7 @@ public class AuthController implements AuthApi {
     }
 
     @Override
+    @GetMapping("/me")
     public ResponseEntity<UserResponse> getCurrentUser() {
         return ResponseEntity.ok(userResponse(SecurityContextHolder.getContext().getAuthentication()));
     }
@@ -69,6 +78,7 @@ public class AuthController implements AuthApi {
     }
 
     @Override
+    @PostMapping("/logout")
     public ResponseEntity<Void> logout(String csrfToken) {
         new SecurityContextLogoutHandler().logout(request, response,
                 SecurityContextHolder.getContext().getAuthentication());

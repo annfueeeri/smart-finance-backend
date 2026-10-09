@@ -15,6 +15,12 @@ mvn spring-boot:run
 `GET /api/health` 返回 `{"status":"UP"}`。此接口仅检查 HTTP 服务，不代表外部服务健康。
 
 OpenAPI 定义位于 `src/main/resources/api.yaml`，接口在构建时生成到 `target/generated-sources/openapi`。
+Controller 层也显式声明路由，便于直接查看：`AuthController` 的公共前缀为 `/api/auth`，
+方法使用 `@GetMapping` 或 `@PostMapping` 声明 `/csrf`、`/register`、`/login`、`/me`、`/logout`；
+`UserManagementController` 的前缀为 `/api/admin/users`，声明 GET 用户列表和 PUT `/{id}/role`；
+`HealthController` 声明 GET `/api/health`。完整路径由类前缀与方法路径组成。
+Controller 仍实现生成接口，参数绑定和校验约束来自接口定义。
+修改路径时需同时更新 OpenAPI 定义、JSON 文档及前端 `src/api/endpoints.ts`。
 模板目录已预留；未提供自定义模板时使用生成器默认模板。
 生成器启用 `useSpringBoot3` 以使用 Jakarta 命名空间；编译目标为 Java 17。
 添加 H2 runtime 依赖仅为无需外部服务即可启动初始项目，其余依赖版本沿用提供的 POM。
