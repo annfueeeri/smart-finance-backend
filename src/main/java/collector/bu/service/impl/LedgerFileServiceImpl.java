@@ -1,4 +1,8 @@
-package collector.bu.service.ledger;
+package collector.bu.service.impl;
+
+import collector.bu.service.LedgerService;
+
+import collector.bu.service.LedgerFileService;
 
 import collector.bu.entity.ledger.LedgerEntry;
 import collector.bu.exception.LedgerException;
@@ -19,13 +23,13 @@ import static collector.bu.model.ledger.LedgerModels.*;
 
 /** 解析 CSV、XLS 和 XLSX，提供无写入预览及安全导出，限制文件大小与行列数量。 */
 @Service
-public class LedgerFiles {
+public class LedgerFileServiceImpl implements LedgerFileService {
     private final LedgerService service;
     private final ObjectMapper mapper;
     private static final Set<String> FIELDS=Set.of("amount","date","kind","account","category","merchant","note","currency","tags");
     private record Table(List<String> headers,List<List<String>> rows,List<Integer> numbers) { }
     /** 注入账本验证服务和 JSON 映射组件。 */
-    public LedgerFiles(LedgerService service,ObjectMapper mapper) { this.service=service; this.mapper=mapper; }
+    public LedgerFileServiceImpl(LedgerService service,ObjectMapper mapper) { this.service=service; this.mapper=mapper; }
     /** 将文件格式、映射或文件内容错误转成统一业务错误，避免暴露解析堆栈。 */
     private LedgerException invalid() { return new LedgerException(LedgerException.Reason.INVALID_REQUEST); }
     /** 读取 UTF-8 CSV 或首张 Excel 工作表，拒绝公式、不支持格式、过大文件及超过 500 条记录。 */
@@ -75,6 +79,7 @@ public class LedgerFiles {
         rows.add(cells.stream().map(String::strip).toList()); numbers.add(number);
     }
     /** 返回表头和前五行示例，供前端配置字段映射，不写入数据库。 */
+    @Override
     public Inspection inspect(MultipartFile file) {
         var table=read(file); return new Inspection(table.headers(),table.rows().stream().limit(5).toList(),table.rows().size());
     }
@@ -120,6 +125,7 @@ public class LedgerFiles {
                 || (!mapping.columns().containsKey("account") && mapping.defaultAccountId()==null)) throw invalid();
     }
     /** 按映射解析每行，提示字段错误及文件内和数据库重复；预览只读、不生成账户或流水。 */
+    @Override
     public Preview preview(String username,MultipartFile file,String mappingJson) {
         final Mapping mapping;
         try { mapping=mapper.readValue(mappingJson,Mapping.class); } catch (IOException exception) { throw invalid(); }
@@ -156,6 +162,7 @@ public class LedgerFiles {
         return !value.isEmpty() && "\'=+-@\t\r".indexOf(value.charAt(0))>=0 ? "'"+value : value;
     }
     /** 生成含字段名的 UTF-8 BOM CSV 或 XLSX，可重新映射导入；只导出当前用户筛选数据。 */
+    @Override
     public byte[] export(String username,String format,String kind,LocalDate start,LocalDate end,Long accountId) {
         if (!format.equals("csv") && !format.equals("xlsx")) throw invalid();
         var entries=service.exportEntries(username,kind,start,end,accountId);

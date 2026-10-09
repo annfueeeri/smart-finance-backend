@@ -1,6 +1,6 @@
 package collector.bu.controller.budget;
 
-import collector.bu.service.budget.BudgetService;
+import collector.bu.service.BudgetService;
 
 import jakarta.validation.Valid;
 import java.time.LocalDate;

@@ -1,4 +1,6 @@
-package collector.bu.service.budget;
+package collector.bu.service.impl;
+
+import collector.bu.service.BudgetService;
 
 import collector.bu.exception.BudgetException;
 
@@ -22,7 +24,7 @@ import static collector.bu.model.budget.BudgetModels.*;
 
 /** 计算个人预算执行、历史对比、结转及站内预警；所有金额按币种精确计算。 */
 @Service
-public class BudgetService {
+public class BudgetServiceImpl implements BudgetService {
     private final UserDao users;
     private final BudgetDao dao;
     private final BudgetAdjustmentDao adjustments;
@@ -31,7 +33,7 @@ public class BudgetService {
     private final TransactionDao transactions;
     private final Clock clock;
     /** 注入用户访问、预算数据库组件，采用可替换时钟以验证跨月和时区边界。 */
-    public BudgetService(UserDao users,BudgetDao dao,BudgetAdjustmentDao adjustments,BudgetTemplateDao templates,BudgetNotificationDao notifications,TransactionDao transactions,Clock clock) { this.users=users;this.dao=dao;this.adjustments=adjustments;this.templates=templates;this.notifications=notifications;this.transactions=transactions;this.clock=clock; }
+    public BudgetServiceImpl(UserDao users,BudgetDao dao,BudgetAdjustmentDao adjustments,BudgetTemplateDao templates,BudgetNotificationDao notifications,TransactionDao transactions,Clock clock) { this.users=users;this.dao=dao;this.adjustments=adjustments;this.templates=templates;this.notifications=notifications;this.transactions=transactions;this.clock=clock; }
     /** 从数据库复查当前认证用户，不允许前端选择查询归属。 */
     private UserAccount actor(String username) { return users.findByUsername(username).filter(u -> u.enabled() && !u.deleted()).orElseThrow(() -> new AccessDeniedException("Active account required")); }
     /** 将预算日期及可选分类交给流水DAO汇总，预算开始前消费为零，统计截止不超过预算结束日。 */
@@ -126,6 +128,7 @@ public class BudgetService {
     }
     /** 刷新个人预算结转与站内预警，在收支提交事务中同步调用；同一阈值每周期只提示一次。 */
     @Transactional
+    @Override
     public void refresh(String username) {
         var user=actor(username);users.lockUser(user.id());var today=today(user);rollover(user,today);
         for(var plan : dao.plans(user.id())) {
@@ -138,6 +141,7 @@ public class BudgetService {
     }
     /** 查询个人指定日期范围预算，刷新结转后给出实时执行状态；不把注册月预算自动当作实际预算。 */
     @Transactional
+    @Override
     public Overview overview(String username,LocalDate start,LocalDate end) {
         var user=actor(username);if(start!=null && end!=null && start.isAfter(end))throw invalid();refresh(username);var today=today(user);
         var items=dao.plans(user.id()).stream().filter(p -> (start==null || !p.end().isBefore(start)) && (end==null || !p.start().isAfter(end)))
@@ -146,6 +150,7 @@ public class BudgetService {
     }
     /** 新建个人预算，唯一范围冲突时返回 409，历史月度预算可以触发后续月份结转。 */
     @Transactional
+    @Override
     public View create(String username,Input input) {
         var user=actor(username);validate(user,input);users.lockUser(user.id());
         try { var plan=dao.create(user.id(),username,input);refresh(username);return view(dao.plan(user.id(),plan.id()),today(user)); }
@@ -153,6 +158,7 @@ public class BudgetService {
     }
     /** 调整已有预算额度、阈值及结转策略，保存旧值和理由，并重新核算后续月份。 */
     @Transactional
+    @Override
     public View adjust(String username,long id,AdjustmentInput input) {
         var user=actor(username);users.lockUser(user.id());var plan=dao.plan(user.id(),id);amount(input.amount(),plan.currency());settings(input.thresholds(),input.rolloverMode(),plan.period());
         if(input.reason()==null || input.reason().strip().isEmpty() || input.reason().length()>300)throw invalid();
@@ -160,6 +166,7 @@ public class BudgetService {
     }
     /** 查询本人预算修改记录，先验证预算归属，禁止跨用户读取调整历史。 */
     @Transactional(readOnly=true)
+    @Override
     public List<Adjustment> adjustments(String username,long id) { var user=actor(username);dao.plan(user.id(),id);return adjustments.adjustments(user.id(),id); }
     /** 严格解析 YYYY-MM，拒绝无效年月与超出前后十年范围的月份。 */
     private YearMonth month(UserAccount user,String text) {
@@ -176,6 +183,7 @@ public class BudgetService {
     }
     /** 把指定月份配置保存为本人常用模板，重复名称返回冲突。 */
     @Transactional
+    @Override
     public Template saveTemplate(String username,SaveTemplate input) {
         var user=actor(username);users.lockUser(user.id());if(input.name()==null || input.name().strip().isEmpty() || input.name().length()>80)throw invalid();
         try { return templates.saveTemplate(user.id(),username,input.name(),items(user,month(user,input.sourceMonth()))); }
@@ -183,6 +191,7 @@ public class BudgetService {
     }
     /** 返回本人月度模板，管理员也不能读取其他人的预算方案。 */
     @Transactional(readOnly=true)
+    @Override
     public List<Template> templates(String username) { return templates.templates(actor(username).id()); }
     /** 原子应用一组月度配置，任何冲突或不合法配置都不允许留下部分预算。 */
     private List<View> apply(UserAccount user,String username,YearMonth month,List<TemplateItem> items) {
@@ -197,21 +206,26 @@ public class BudgetService {
     }
     /** 将本人模板应用到目标月份，保留已有预算，冲突返回 409。 */
     @Transactional
+    @Override
     public List<View> applyTemplate(String username,long id,ApplyTemplate input) { var user=actor(username);return apply(user,username,month(user,input.month()),templates.template(user.id(),id).items()); }
     /** 将上月或其他月份的配置复制到新月份，不复制消费或重复增加结转余额。 */
     @Transactional
+    @Override
     public List<View> copyMonth(String username,CopyMonth input) {
         var user=actor(username);var source=month(user,input.sourceMonth());var target=month(user,input.targetMonth());if(source.equals(target))throw invalid();
         users.lockUser(user.id());return apply(user,username,target,items(user,source));
     }
     /** 获取本人站内预警并刷新当前预算，保留原始通知时间与已读状态。 */
     @Transactional
+    @Override
     public List<Notice> notices(String username) { refresh(username);return notifications.notices(actor(username).id()); }
     /** 标记本人消息已读，审计用户为当前登录账号。 */
     @Transactional
+    @Override
     public void readNotice(String username,long id) { var user=actor(username);notifications.readNotice(user.id(),id,username); }
     /** 分析已结束月度预算及分类超支频次，按分类与币种分组，不把总预算重复算入分类合计。 */
     @Transactional
+    @Override
     public History history(String username,String from,String to) {
         var user=actor(username);refresh(username);var today=today(user);
         var first=from==null ? YearMonth.from(today).minusMonths(12) : month(user,from);var last=to==null ? YearMonth.from(today).minusMonths(1) : month(user,to);

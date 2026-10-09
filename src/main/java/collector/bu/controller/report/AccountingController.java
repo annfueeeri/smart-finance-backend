@@ -1,6 +1,6 @@
 package collector.bu.controller.report;
 
-import collector.bu.service.report.AccountingService;
+import collector.bu.service.AccountingService;
 
 import collector.bu.entity.ledger.LedgerAccount;
 import jakarta.validation.Valid;

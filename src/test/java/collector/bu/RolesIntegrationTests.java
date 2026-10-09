@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import collector.bu.dao.UserDao;
 import collector.bu.entity.UserRole;
-import collector.bu.service.impl.LocalAccountInitializer;
+import collector.bu.config.LocalAccountInitializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import java.util.Map;

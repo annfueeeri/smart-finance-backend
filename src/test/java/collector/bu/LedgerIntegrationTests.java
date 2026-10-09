@@ -1,8 +1,8 @@
 package collector.bu;
 
 import collector.bu.exception.LedgerException;
-import collector.bu.service.ledger.LedgerFiles;
-import collector.bu.service.ledger.LedgerService;
+import collector.bu.service.LedgerFileService;
+import collector.bu.service.LedgerService;
 
 import collector.bu.dao.UserDao;
 import collector.bu.entity.UserRole;
@@ -31,7 +31,7 @@ class LedgerIntegrationTests {
     @Autowired UserDao users;
     @Autowired PasswordEncoder encoder;
     @Autowired LedgerService service;
-    @Autowired LedgerFiles files;
+    @Autowired LedgerFileService files;
     @Autowired ObjectMapper mapper;
     private static final String PASSWORD="Ledger-testing-password-123";
     /** 清理本套测试的流水、账户及账号，创建独立管理员和普通用户。 */

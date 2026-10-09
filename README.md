@@ -110,7 +110,7 @@ WHERE username = '指定的管理员用户名' AND enabled = TRUE AND is_deleted
 | 层 | 代码 | 职责 |
 | --- | --- | --- |
 | Controller | `controller/auth/AuthController.java` | 实现生成的 AuthApi，接收请求、调用 Service、处理 Session 与响应 |
-| Service | `service/AuthService.java`、`service/impl/AuthServiceImpl.java`、`service/impl/DatabaseUserDetailsService.java` | 认证、密码与账号状态检查，通过 UserDao 加载账号 |
+| Service | `service/AuthService.java`、`service/impl/AuthServiceImpl.java`、`service/DatabaseUserDetailsService.java`、`service/impl/DatabaseUserDetailsServiceImpl.java` | 认证、密码与账号状态检查，通过 UserDao 加载账号 |
 | DAO | `dao/UserDao.java`、`dao/impl/JdbcUserDao.java` | 参数化 SQL 查询和插入用户 |
 
 Controller 不通过 DAO 或 JdbcTemplate 访问数据库；用户管理 Controller 将业务层返回的内部账号转换为安全响应，SQL 仅出现在 DAO。
@@ -411,12 +411,16 @@ controller/                 HTTP请求、参数绑定与响应
   HealthController.java
   ApiExceptionHandler.java
 service/                    业务校验、权限复查和事务协调
-  ledger/                   收支与文件导入导出
-  budget/                   预算、结转、提醒和调整历史协调
-  report/                   账户辅助业务、统计计算与报表导出
-  impl/                     认证与用户管理实现
   AuthService.java
   UserManagementService.java
+  DatabaseUserDetailsService.java
+  LedgerService.java
+  LedgerFileService.java
+  BudgetService.java
+  AccountingService.java
+  ReportService.java
+  ReportExportService.java
+  impl/                     与上述接口同名加Impl后缀的实现类
 dao/                        按模块独立的数据访问文件
   UserDao.java
   impl/JdbcUserDao.java
@@ -432,7 +436,7 @@ dao/                        按模块独立的数据访问文件
 entity/                     数据库实体，账户和流水位于ledger子包
 model/                      ledger/budget/report请求、响应及统计结构
 exception/                  统一业务异常
-config/                     安全配置及budget定时任务
+config/                     安全配置、本地账号初始化及budget定时任务
 support/ledger/             共享交易标签编解码，不执行SQL
 ```
 
@@ -444,3 +448,26 @@ support/ledger/             共享交易标签编解码，不执行SQL
 DAO保持参数化SQL、用户归属筛选、逻辑删除条件及审计字段；Controller只调用Service。
 本次仅重构Java包与职责，HTTP路径、参数、JSON文档和数据库结构不变，无需新增迁移。
 OpenAPI接口和模型仍由Maven生成到target/generated-sources/openapi，勿手动移动生成文件。
+
+
+### Service与Impl一一对应
+
+`service`根目录只保留业务接口，`service/impl`只保留对应实现，原ledger/budget/report子目录已删除。
+Controller、定时任务、其他Service和集成测试统一依赖接口，数据库访问和事务注解保留在实现类中。
+
+| Service接口 | 对应实现 |
+| --- | --- |
+| AuthService | AuthServiceImpl |
+| UserManagementService | UserManagementServiceImpl |
+| DatabaseUserDetailsService | DatabaseUserDetailsServiceImpl |
+| LedgerService | LedgerServiceImpl |
+| LedgerFileService | LedgerFileServiceImpl |
+| BudgetService | BudgetServiceImpl |
+| AccountingService | AccountingServiceImpl |
+| ReportService | ReportServiceImpl |
+| ReportExportService | ReportExportServiceImpl |
+
+DatabaseUserDetailsService继承Spring Security的UserDetailsService，数据库认证保持框架兼容。
+LocalAccountInitializer是ApplicationRunner启动组件，位于config；仅local环境按显式配置初始化账号。
+每个接口方法和实现方法均保留说明注释，实现类公开接口方法标记@Override。
+HTTP路径、参数、数据隔离、审计和数据库结构保持原样，本次无需数据库迁移。

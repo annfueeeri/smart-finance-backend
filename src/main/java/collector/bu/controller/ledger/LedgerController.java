@@ -2,8 +2,8 @@ package collector.bu.controller.ledger;
 
 import collector.bu.entity.ledger.LedgerAccount;
 import collector.bu.entity.ledger.LedgerEntry;
-import collector.bu.service.ledger.LedgerFiles;
-import collector.bu.service.ledger.LedgerService;
+import collector.bu.service.LedgerFileService;
+import collector.bu.service.LedgerService;
 
 import jakarta.validation.Valid;
 import java.time.LocalDate;
@@ -17,9 +17,9 @@ import static collector.bu.model.ledger.LedgerModels.*;
 @RestController
 public class LedgerController {
     private final LedgerService service;
-    private final LedgerFiles files;
+    private final LedgerFileService files;
     /** 注入个人收支业务服务。 */
-    public LedgerController(LedgerService service,LedgerFiles files) { this.service=service; this.files=files; }
+    public LedgerController(LedgerService service,LedgerFileService files) { this.service=service; this.files=files; }
     /** 读取当前服务端认证用户名，不接受前端指定身份或用户 ID。 */
     private String username() { return SecurityContextHolder.getContext().getAuthentication().getName(); }
     /** GET /api/ledger/options：加载个人账户、收入支出分类及默认记账日期。 */

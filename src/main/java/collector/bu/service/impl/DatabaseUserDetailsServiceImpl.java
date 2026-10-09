@@ -3,20 +3,20 @@ package collector.bu.service.impl;
 import collector.bu.dao.UserDao;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
+import collector.bu.service.DatabaseUserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class DatabaseUserDetailsService implements UserDetailsService {
+public class DatabaseUserDetailsServiceImpl implements DatabaseUserDetailsService {
     private final UserDao userDao;
 
     /**
      * 注入账号查询组件，为 Spring Security 的数据库认证提供账号数据。
      * @param userDao 账号数据库访问组件
      */
-    public DatabaseUserDetailsService(UserDao userDao) {
+    public DatabaseUserDetailsServiceImpl(UserDao userDao) {
         this.userDao = userDao;
     }
 

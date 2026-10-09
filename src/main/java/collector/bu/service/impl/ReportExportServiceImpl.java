@@ -1,4 +1,6 @@
-package collector.bu.service.report;
+package collector.bu.service.impl;
+
+import collector.bu.service.ReportExportService;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -16,7 +18,7 @@ import static collector.bu.model.report.ReportModels.*;
 
 /** 从同一报表结果生成完整CSV、含原生图表XLSX、含矢量图及统计明细PDF。 */
 @Service
-public class ReportExport {
+public class ReportExportServiceImpl implements ReportExportService {
     private static final List<String> HEADERS=List.of("section","currency","date","name","value","count","percentage","account");
     /** 把所有统计拆为统一行，货币字符串不改变精度，所有导出格式使用相同明细。 */
     private List<List<String>> rows(Report report) {
@@ -94,7 +96,7 @@ public class ReportExport {
     private class Pdf implements AutoCloseable {
         final PDDocument document;final PDType0Font font;PDPageContentStream stream;float y;
         /** 从随应用打包的OFL中文字体初始化可移植PDF，不依赖运行机器字体。 */
-        Pdf(PDDocument document) throws IOException { this.document=document;try(var input=ReportExport.class.getResourceAsStream("/fonts/NotoSansSC-Regular.ttf")){font=PDType0Font.load(document,input);}page(); }
+        Pdf(PDDocument document) throws IOException { this.document=document;try(var input=ReportExportServiceImpl.class.getResourceAsStream("/fonts/NotoSansSC-Regular.ttf")){font=PDType0Font.load(document,input);}page(); }
         /** 新增A4页并关闭上一页绘制流，确保所有明细均可写入。 */
         void page() throws IOException { if(stream!=null)stream.close();var page=new PDPage(PDRectangle.A4);document.addPage(page);stream=new PDPageContentStream(document,page);y=795; }
         /** 绘制指定位置文字，兼容中文、日文和拉丁字符。 */
@@ -138,6 +140,7 @@ public class ReportExport {
         }
     }
     /** 选择CSV/XLSX/PDF导出，不支持格式拒绝；解析或字体故障不伪装成成功文件。 */
+    @Override
     public byte[] export(Report report,String format) {
         var rows=rows(report);
         try {return switch(format){case "csv" -> csv(rows);case "xlsx" -> excel(report,rows);case "pdf" -> pdf(report,rows);default -> throw new collector.bu.exception.LedgerException(collector.bu.exception.LedgerException.Reason.INVALID_REQUEST);};}

@@ -1,11 +1,11 @@
 package collector.bu;
 
 import collector.bu.exception.LedgerException;
-import collector.bu.service.ledger.LedgerFiles;
-import collector.bu.service.ledger.LedgerService;
-import collector.bu.service.report.AccountingService;
-import collector.bu.service.report.ReportExport;
-import collector.bu.service.report.ReportService;
+import collector.bu.service.LedgerFileService;
+import collector.bu.service.LedgerService;
+import collector.bu.service.AccountingService;
+import collector.bu.service.ReportExportService;
+import collector.bu.service.ReportService;
 
 import collector.bu.dao.UserDao;
 import collector.bu.entity.UserRole;
@@ -35,10 +35,10 @@ class ReportIntegrationTests {
     @Autowired LedgerService ledger;
     @Autowired AccountingService accounting;
     @Autowired ReportService reports;
-    @Autowired ReportExport exports;
-    @Autowired LedgerFiles files;
+    @Autowired ReportExportService exports;
+    @Autowired LedgerFileService files;
     @Autowired com.fasterxml.jackson.databind.ObjectMapper mapper;
-    @Autowired collector.bu.service.budget.BudgetService budgets;
+    @Autowired collector.bu.service.BudgetService budgets;
     private static final String USER="report-test-user",ADMIN="report-test-admin",PASSWORD="Report-testing-password-123";
     /** 按外键依赖清理本人财务测试数据，管理员保留独立身份验证隔离。 */
     @BeforeEach void setup(){

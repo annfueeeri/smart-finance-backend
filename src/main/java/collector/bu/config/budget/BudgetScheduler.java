@@ -1,6 +1,6 @@
 package collector.bu.config.budget;
 
-import collector.bu.service.budget.BudgetService;
+import collector.bu.service.BudgetService;
 
 import java.time.Clock;
 import collector.bu.dao.BudgetDao;

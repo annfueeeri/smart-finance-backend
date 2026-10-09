@@ -1,9 +1,11 @@
-package collector.bu.service.report;
+package collector.bu.service.impl;
+
+import collector.bu.service.ReportService;
 
 import collector.bu.entity.ledger.LedgerAccount;
 import collector.bu.exception.LedgerException;
 import collector.bu.model.ledger.LedgerCategory;
-import collector.bu.service.ledger.LedgerService;
+import collector.bu.service.LedgerService;
 
 import collector.bu.dao.AccountDao;
 import collector.bu.dao.TransactionDao;
@@ -21,7 +23,7 @@ import static collector.bu.model.report.ReportModels.*;
 
 /** 个人财务报表计算，币种分组、金额精确、收支与内部转账/非现金估值分别统计。 */
 @Service
-public class ReportService {
+public class ReportServiceImpl implements ReportService {
     private final LedgerService users;
     private final AccountDao accounts;
     private final TransactionDao transactions;
@@ -32,7 +34,7 @@ public class ReportService {
     private record Balance(BigDecimal value,boolean known) { }
     private record Data(List<LedgerAccount> accounts,List<Movement> movements,List<Transfer> transfers,List<Valuation> values) { }
     /** 注入用户验证、真实数据访问和时钟，默认周期按用户时区确定。 */
-    public ReportService(LedgerService users,AccountDao accounts,TransactionDao transactions,TransferDao transfers,AccountValuationDao valuations,ReportDao dao,Clock clock) { this.users=users;this.accounts=accounts;this.transactions=transactions;this.transfers=transfers;this.valuations=valuations;this.dao=dao;this.clock=clock; }
+    public ReportServiceImpl(LedgerService users,AccountDao accounts,TransactionDao transactions,TransferDao transfers,AccountValuationDao valuations,ReportDao dao,Clock clock) { this.users=users;this.accounts=accounts;this.transactions=transactions;this.transfers=transfers;this.valuations=valuations;this.dao=dao;this.clock=clock; }
     /** 将报表参数错误转成通用400，避免泄露实现或其他用户数据。 */
     private LedgerException invalid() { return new LedgerException(LedgerException.Reason.INVALID_REQUEST); }
     /** 完成默认日期、分组及筛选检查，日报最长366天，其他分组最长十年。 */
@@ -171,9 +173,11 @@ public class ReportService {
     }
     /** 获取当前用户全部真实标签作为自定义报表筛选候选。 */
     @Transactional(readOnly=true)
+    @Override
     public ReportOptions options(String username) { return new ReportOptions(transactions.tags(users.actor(username).id())); }
     /** 生成完整自定义财务报表，同一计算结果供页面、CSV、Excel和PDF共用。 */
     @Transactional(readOnly=true)
+    @Override
     public Report report(String username,Filter input) {
         var user=users.actor(username);var filter=filter(username,input);
         var selectedAccounts=accounts.accounts(user.id()).stream().filter(a -> (filter.accountId()==null || filter.accountId()==a.id()) && (filter.currency()==null || filter.currency().equals(a.currency()))).toList();

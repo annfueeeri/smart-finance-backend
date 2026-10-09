@@ -1,7 +1,7 @@
 package collector.bu.controller.report;
 
-import collector.bu.service.report.ReportExport;
-import collector.bu.service.report.ReportService;
+import collector.bu.service.ReportExportService;
+import collector.bu.service.ReportService;
 
 import java.time.LocalDate;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -13,9 +13,9 @@ import static collector.bu.model.report.ReportModels.*;
 /** 个人报表完整路径显式列出，查询和导出均复用同一统计条件与算法。 */
 @RestController
 public class ReportController {
-    private final ReportService service;private final ReportExport exports;
+    private final ReportService service;private final ReportExportService exports;
     /** 注入财务统计业务与安全导出组件。 */
-    public ReportController(ReportService service,ReportExport exports) {this.service=service;this.exports=exports;}
+    public ReportController(ReportService service,ReportExportService exports) {this.service=service;this.exports=exports;}
     /** 从认证会话获取用户名，不接受任何客户端用户ID。 */
     private String username(){return SecurityContextHolder.getContext().getAuthentication().getName();}
     /** GET /api/reports/options：列出本人真实交易标签，供自定义筛选。 */

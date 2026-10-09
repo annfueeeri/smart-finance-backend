@@ -1,4 +1,4 @@
-package collector.bu.service.impl;
+package collector.bu.config;
 
 import collector.bu.dao.UserDao;
 import collector.bu.entity.UserRole;
@@ -9,11 +9,11 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 可选的本地账号初始化器，没有内置密码，也不会覆盖已有账号。 */
-@Service
+@Component
 @Profile("local")
 public class LocalAccountInitializer implements ApplicationRunner {
     private final UserDao userDao;
