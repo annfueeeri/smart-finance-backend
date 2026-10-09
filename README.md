@@ -82,3 +82,21 @@ Spring Batch 所需表仍需另行准备。
 
 `mvn verify` 包含真实 HTTP 与数据库集成测试，覆盖登录、Cookie / Session 更换、当前用户、退出、
 未知 / 禁用账号、输入验证、CSRF 和 SQL 注入输入。OpenAPI 的认证接口和模型仍由 `api.yaml` 构建生成。
+
+## 与前端联调
+
+前端仓库：[smart-finance-frontend](https://github.com/annfueeeri/smart-finance-frontend)。
+登录页统一发送 JSON `{ username, password }`；原来的 email 演示字段已改为 username。
+邮箱形式的账号也可以作为 username 使用，但需要事先在数据库中创建。
+
+先按上文初始化本地账号并启动后端，然后在前端执行 `npm ci` 和 `npm run dev`。
+前端的 `src/api/auth.ts` 统一处理 CSRF、登录、当前用户和退出请求。
+Vite 默认将 `/api` 代理到后端 8080；本云环境后端使用 18080 时，前端启动命令为：
+
+```sh
+BACKEND_URL=http://127.0.0.1:18080 npm run dev
+```
+
+浏览器始终请求前端网站的 `/api`，Cookie 和 CSRF 保持同源。
+生产部署同样应反向代理 `/api`，并在 HTTPS 下设置 `SESSION_COOKIE_SECURE=true`。
+前后端保持两个独立仓库，云环境中可以一起启动和测试。
