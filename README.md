@@ -66,7 +66,7 @@ MinIO 客户端依赖已包含；初始项目没有对象存储业务，因此�
 
 前端侧边栏“ユーザー一覧”对管理员和一般用户都显示。
 `GET /api/users` 按当前会话的数据库身份限定查询范围：管理员查看全部未删除用户，一般用户只查看自身。
-返回 `{ id, username, role, enabled, createdAt, createdBy, updatedAt, updatedBy, isDeleted }` 列表，
+返回用户基本信息、审计字段以及 `displayName`、`email`、`phone`、`currency`、`timezone`、`monthlyBudget`、`budgetStartDay` 的列表，
 其中日期时间为数据库本地时间的 ISO 字符串，不带时区偏移；用户一览只返回 `isDeleted=false` 的账号。
 管理员可在页面修改其他用户身份，自己的行只读；一般用户没有编辑控件。
 身份提升或降级后，原会话的下一次查询立即按新身份决定范围。
@@ -119,7 +119,7 @@ Controller 不通过 DAO 或 JdbcTemplate 访问数据库；用户管理 Control
 | 接口 | 行为 |
 | --- | --- |
 | `GET /api/auth/csrf` | 获取 token、headerName、parameterName；同时保留 JSESSIONID cookie |
-| `POST /api/auth/register` | JSON `{ username, password, confirmPassword }`；成功返回 201 和用户名，不自动登录 |
+| `POST /api/auth/register` | JSON 必填 `{ displayName, username, password, confirmPassword }`，可选联系方式和记账偏好见下文；成功返回 201，不自动登录 |
 | `POST /api/auth/login` | JSON `{ "username": "你的用户名", "password": "你的密码" }`；成功返回用户名并更换 Session ID |
 | `GET /api/auth/me` | 携带登录后的 cookie 获取当前用户名；未登录返回 401 |
 | `POST /api/auth/logout` | 携带 cookie 与有效 CSRF token，销毁 Session，返回 204 |
@@ -206,3 +206,48 @@ BACKEND_URL=http://127.0.0.1:18080 npm run dev
 浏览器始终请求前端网站的 `/api`，Cookie 和 CSRF 保持同源。
 生产部署同样应反向代理 `/api`，并在 HTTPS 下设置 `SESSION_COOKIE_SECURE=true`。
 前后端保持两个独立仓库，云环境中可以一起启动和测试。
+
+
+## 完整注册资料与记账偏好
+
+注册表单分为基本资料、联系方式、记账设置和密码设置。登录账号不要求邮箱格式，
+支持普通用户名、中文、数字和邮箱形式；姓名/昵称与账号分开保存，允许重名，账号仍须唯一。
+联系邮箱不是登录别名，登录始终使用 `username`。
+
+| 接口字段 | 数据库字段 | 规则 |
+| --- | --- | --- |
+| `displayName` | `display_name` | 必填姓名/昵称，1–80 字符，不允许控制字符或全空白 |
+| `username` | `username` | 必填唯一登录账号，1–64 个非空白字符 |
+| `email` | `email` | 可选联系邮箱，最多 254 字符，未填写为空字符串 |
+| `phone` | `phone` | 可选手机号，填写时 7–32 字符，支持数字、国际区号和常见分隔符 |
+| `currency` | `currency` | ISO 4217 默认币种，缺省 JPY |
+| `timezone` | `timezone` | IANA 时区，缺省 Asia/Tokyo |
+| `monthlyBudget` | `monthly_budget` | 可选月度预算，十进制字符串，不填为数据库 NULL、响应空字符串 |
+| `budgetStartDay` | `budget_start_day` | 每月预算周期开始日，1–28，缺省 1 |
+| `password`、`confirmPassword` | `password_hash` | 保持原密码约束，数据库仅保存 BCrypt 哈希 |
+
+`POST /api/auth/register` 示例（密码仅为示例，不是内置凭据）：
+
+```json
+{
+  "displayName": "山田 太郎",
+  "username": "taro_2026",
+  "email": "taro@example.com",
+  "phone": "+81 90-1234-5678",
+  "currency": "CNY",
+  "timezone": "Asia/Shanghai",
+  "monthlyBudget": "5000.50",
+  "budgetStartDay": 15,
+  "password": "Example-only-ChangeMe-2026",
+  "confirmPassword": "Example-only-ChangeMe-2026"
+}
+```
+
+金额最多 12 位整数，小数位不能超过币种精度（JPY/KRW 为 0，CNY/USD 为 2），
+以 BigDecimal 和 DECIMAL 保存，禁止浮点舍入。月度预算可以为 0；空值表示未设置预算。
+新增资料和偏好也返回在用户一览中，查询范围继续由管理员/一般用户身份决定。
+这些偏好为后续真实记账提供设置；当前资产与交易演示模块不会据此自动换算金额或生成预算报表。
+
+已有 MySQL 在 V2、V3 完成后执行一次 `src/main/resources/db/migration/V4__add_user_profile_mysql.sql`。
+姓名暂回填为原账号，邮箱/手机号为空，偏好使用默认值，原主键、密码、身份及审计时间保持不变。
+新安装直接执行 `db/schema-users.sql`。此迁移不自动执行；旧客户端注册请求也必须增加 `displayName`。

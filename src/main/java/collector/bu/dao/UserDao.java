@@ -4,6 +4,7 @@ import collector.bu.entity.UserAccount;
 import collector.bu.entity.UserRole;
 import java.util.List;
 import java.util.Optional;
+import java.math.BigDecimal;
 
 public interface UserDao {
     /**
@@ -44,7 +45,27 @@ public interface UserDao {
      * @param actor 由后端业务确定的创建操作者，不能信任客户端提交的审计字段
      * @throws org.springframework.dao.DuplicateKeyException 用户名已存在
      */
-    void insert(String username, String passwordHash, UserRole role, String actor);
+    default void insert(String username, String passwordHash, UserRole role, String actor) {
+        insert(username, passwordHash, role, actor, username, "", "", "JPY", "Asia/Tokyo", null, 1);
+    }
+
+    /**
+     * 新增账号及独立的姓名、联系资料，同时记录创建审计信息。
+     * @param username 唯一登录账号，支持普通用户名或邮箱形式
+     * @param passwordHash 已生成的密码哈希
+     * @param role 后端指定的初始身份
+     * @param actor 后端确定的创建操作者
+     * @param displayName 姓名或昵称，可以与其他账号重名
+     * @param email 可选联系邮箱，未填写时为空字符串
+     * @param phone 可选联系手机号，未填写时为空字符串
+     * @param currency 默认记账币种
+     * @param timezone 用户所在时区
+     * @param monthlyBudget 可选月度预算，未设置为 null
+     * @param budgetStartDay 预算周期起始日，1–28
+     */
+    void insert(String username, String passwordHash, UserRole role, String actor,
+            String displayName, String email, String phone, String currency, String timezone,
+            BigDecimal monthlyBudget, int budgetStartDay);
 
     /**
      * 按数据库主键查询未删除账号，供身份修改时确认目标用户。

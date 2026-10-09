@@ -55,7 +55,7 @@ class RolesIntegrationTests {
         var result = admin.get("/api/admin/users");
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         for (var user : result.getBody()) {
-            assertThat(user.size()).isEqualTo(9);
+            assertThat(user.size()).isEqualTo(16);
             assertThat(user.has("id") && user.has("username") && user.has("role") && user.has("enabled"))
                     .isTrue();
         }
@@ -81,7 +81,7 @@ class RolesIntegrationTests {
         assertThat(self.get("updatedAt").asText()).isNotBlank();
         assertThat(self.get("updatedBy").asText()).isEqualTo("role-test-user");
         assertThat(self.get("isDeleted").asBoolean()).isFalse();
-        assertThat(self.size()).isEqualTo(9);
+        assertThat(self.size()).isEqualTo(16);
 
         var admin = signedIn("role-test-admin");
         var all = admin.get("/api/users");
@@ -114,7 +114,7 @@ class RolesIntegrationTests {
         var browser = new Browser();
         browser.csrf();
         var result = browser.exchange("/api/auth/register", HttpMethod.POST, Map.of(
-                "username", "role-test-audit", "password", PASSWORD, "confirmPassword", PASSWORD,
+                "username", "role-test-audit", "displayName", "权限测试用户", "password", PASSWORD, "confirmPassword", PASSWORD,
                 "createdBy", "forged-admin", "updatedBy", "forged-admin",
                 "createdAt", "2000-01-01T00:00:00", "isDeleted", true));
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -171,7 +171,7 @@ class RolesIntegrationTests {
         assertThat(admin.put(userId, "ADMIN").getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(users.findByUsername("role-test-user").orElseThrow().deleted()).isTrue();
         assertThat(fresh.exchange("/api/auth/register", HttpMethod.POST, Map.of(
-                "username", "role-test-user", "password", PASSWORD, "confirmPassword", PASSWORD)).getStatusCode())
+                "username", "role-test-user", "displayName", "权限测试用户", "password", PASSWORD, "confirmPassword", PASSWORD)).getStatusCode())
                 .isEqualTo(HttpStatus.CONFLICT);
     }
 
@@ -242,7 +242,7 @@ class RolesIntegrationTests {
         var browser = new Browser();
         browser.csrf();
         var result = browser.exchange("/api/auth/register", HttpMethod.POST, Map.of(
-                "username", "role-test-signup", "password", PASSWORD, "confirmPassword", PASSWORD,
+                "username", "role-test-signup", "displayName", "权限测试用户", "password", PASSWORD, "confirmPassword", PASSWORD,
                 "role", "ADMIN"));
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(result.getBody().get("role").asText()).isEqualTo("USER");

@@ -5,6 +5,7 @@ import collector.bu.entity.UserAccount;
 import collector.bu.entity.UserRole;
 import java.util.List;
 import java.util.Optional;
+import java.math.BigDecimal;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -13,13 +14,17 @@ import org.springframework.stereotype.Repository;
 public class JdbcUserDao implements UserDao {
     private final JdbcTemplate jdbc;
     private static final String COLUMNS = "id, username, password_hash, enabled, role, is_deleted, "
-            + "created_at, created_by, updated_at, updated_by";
+            + "created_at, created_by, updated_at, updated_by, display_name, email, phone, "
+            + "currency, timezone, monthly_budget, budget_start_day";
     private static final RowMapper<UserAccount> ROW = (rs, row) -> new UserAccount(
             rs.getLong("id"), rs.getString("username"), rs.getString("password_hash"),
             rs.getBoolean("enabled"), UserRole.valueOf(rs.getString("role")),
             rs.getBoolean("is_deleted"),
             rs.getTimestamp("created_at").toLocalDateTime(), rs.getString("created_by"),
-            rs.getTimestamp("updated_at").toLocalDateTime(), rs.getString("updated_by"));
+            rs.getTimestamp("updated_at").toLocalDateTime(), rs.getString("updated_by"),
+            rs.getString("display_name"), rs.getString("email"), rs.getString("phone"),
+            rs.getString("currency"), rs.getString("timezone"), rs.getBigDecimal("monthly_budget"),
+            rs.getInt("budget_start_day"));
 
     /**
      * 注入 JdbcTemplate，以参数化 SQL 查询和修改 app_user 表。
@@ -50,14 +55,25 @@ public class JdbcUserDao implements UserDao {
      * @param passwordHash 已生成的密码哈希，禁止传入明文密码
      * @param role 新账号身份
      * @param actor 后端确定的创建操作者，创建和初始修改用户均记录该值
+     * @param displayName 姓名或昵称，与登录账号分开保存
+     * @param email 可选联系邮箱，未填写为空字符串
+     * @param phone 可选联系手机号，未填写为空字符串
+     * @param currency 默认记账币种
+     * @param timezone 用户时区
+     * @param monthlyBudget 可选月度预算，未设置为 null
+     * @param budgetStartDay 预算周期起始日
      * @throws org.springframework.dao.DuplicateKeyException 用户名已存在
      */
     @Override
-    public void insert(String username, String passwordHash, UserRole role, String actor) {
+    public void insert(String username, String passwordHash, UserRole role, String actor,
+            String displayName, String email, String phone, String currency, String timezone,
+            BigDecimal monthlyBudget, int budgetStartDay) {
         jdbc.update("INSERT INTO app_user (username, password_hash, enabled, role, "
-                + "created_at, created_by, updated_at, updated_by) "
-                + "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP(6), ?, CURRENT_TIMESTAMP(6), ?)",
-                username, passwordHash, true, role.name(), actor, actor);
+                + "created_at, created_by, updated_at, updated_by, display_name, email, phone, "
+                + "currency, timezone, monthly_budget, budget_start_day) "
+                + "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP(6), ?, CURRENT_TIMESTAMP(6), ?, ?, ?, ?, ?, ?, ?, ?)",
+                username, passwordHash, true, role.name(), actor, actor, displayName, email, phone,
+                currency, timezone, monthlyBudget, budgetStartDay);
     }
 
     /**

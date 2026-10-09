@@ -63,13 +63,15 @@ public class AuthController implements AuthApi {
      * 处理 POST /api/auth/register，校验注册信息并创建一般用户账号。
      * 密码由业务层进行哈希处理，注册成功后仍需单独登录。
      * @param csrfToken CSRF 请求头值，由 Spring Security 在进入方法前校验
-     * @param body 用户名、密码和确认密码
+     * @param body 独立的姓名、登录账号、可选联系邮箱与手机号、密码和确认密码
      * @return HTTP 201，返回新账号的用户名和 USER 身份
      */
     @Override
     @PostMapping(value = "/register", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<UserResponse> register(String csrfToken, RegisterRequest body) {
-        authService.register(body.getUsername(), body.getPassword(), body.getConfirmPassword());
+        authService.register(body.getUsername(), body.getPassword(), body.getConfirmPassword(),
+                body.getDisplayName(), body.getEmail(), body.getPhone(), body.getCurrency(), body.getTimezone(),
+                body.getMonthlyBudget(), body.getBudgetStartDay());
         return ResponseEntity.status(201).body(new UserResponse(body.getUsername(), Role.USER));
     }
 

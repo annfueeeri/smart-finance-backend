@@ -1,6 +1,7 @@
 package collector.bu.entity;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 /**
  * 数据库账号的内部表示，禁止直接作为接口响应，以免泄露密码哈希。
@@ -15,7 +16,16 @@ import java.time.LocalDateTime;
  * @param createdBy 创建操作者用户名，系统初始化为 SYSTEM，历史数据迁移为 LEGACY
  * @param updatedAt 数据库记录的最后修改时间
  * @param updatedBy 最后修改操作者用户名，创建时与创建用户一致
+ * @param displayName 姓名或昵称，与唯一登录账号独立，可以重名
+ * @param email 可选联系邮箱，未填写为空字符串，不是登录账号别名
+ * @param phone 可选联系手机号，未填写为空字符串
+ * @param currency 默认记账币种，使用 ISO 4217 代码
+ * @param timezone 用户所在 IANA 时区
+ * @param monthlyBudget 可选月度预算，未设置为 null，使用十进制定点金额
+ * @param budgetStartDay 预算周期每月开始日，1–28 保证每个月都有该日期
  */
 public record UserAccount(long id, String username, String passwordHash, boolean enabled, UserRole role, boolean deleted,
-        LocalDateTime createdAt, String createdBy, LocalDateTime updatedAt, String updatedBy) {
+        LocalDateTime createdAt, String createdBy, LocalDateTime updatedAt, String updatedBy,
+        String displayName, String email, String phone, String currency, String timezone,
+        BigDecimal monthlyBudget, int budgetStartDay) {
 }

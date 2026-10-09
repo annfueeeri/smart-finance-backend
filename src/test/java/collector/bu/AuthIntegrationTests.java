@@ -40,10 +40,10 @@ class AuthIntegrationTests {
         jdbc.update("DELETE FROM app_user WHERE username LIKE 'registration-%'");
         jdbc.update("DELETE FROM app_user WHERE username IN (?, ?)", "login-test", "disabled-test");
         String hash = encoder.encode(PASSWORD);
-        jdbc.update("INSERT INTO app_user (username, password_hash, enabled) VALUES (?, ?, ?)",
-                "login-test", hash, true);
-        jdbc.update("INSERT INTO app_user (username, password_hash, enabled) VALUES (?, ?, ?)",
-                "disabled-test", hash, false);
+        jdbc.update("INSERT INTO app_user (username, password_hash, enabled, display_name) VALUES (?, ?, ?, ?)",
+                "login-test", hash, true, "登录测试用户");
+        jdbc.update("INSERT INTO app_user (username, password_hash, enabled, display_name) VALUES (?, ?, ?, ?)",
+                "disabled-test", hash, false, "禁用测试用户");
     }
 
     /**
@@ -66,6 +66,77 @@ class AuthIntegrationTests {
         assertThat(browser.login("registration-new", PASSWORD).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(browser.get("/api/auth/me").getBody().get("username").asText())
                 .isEqualTo("registration-new");
+    }
+
+    /** 验证姓名与账号独立，普通用户名、中文、数字及邮箱形式都能注册和登录，偏好及联系资料被保存。 */
+    @Test
+    void registrationStoresIndependentProfileAndBookkeepingPreferences() {
+        for (var username : List.of("registration-taro_2026", "registration-山田太郎", "1234567890",
+                "registration-taro@example.com")) {
+            var browser = new Browser();
+            browser.refreshCsrf();
+            var result = browser.post("/api/auth/register", Map.of(
+                    "username", username, "displayName", "山田 太郎", "password", PASSWORD,
+                    "confirmPassword", PASSWORD, "email", "contact@example.com", "phone", "+81 90-1234-5678",
+                    "currency", "CNY", "timezone", "Asia/Shanghai", "monthlyBudget", "12345.67", "budgetStartDay", 15));
+            assertThat(result.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+            var account = userDao.findByUsername(username).orElseThrow();
+            assertThat(account.displayName()).isEqualTo("山田 太郎");
+            assertThat(account.email()).isEqualTo("contact@example.com");
+            assertThat(account.phone()).isEqualTo("+81 90-1234-5678");
+            assertThat(account.currency()).isEqualTo("CNY");
+            assertThat(account.timezone()).isEqualTo("Asia/Shanghai");
+            assertThat(account.monthlyBudget()).isEqualByComparingTo("12345.67");
+            assertThat(account.budgetStartDay()).isEqualTo(15);
+            assertThat(account.createdBy()).isEqualTo(username);
+            assertThat(browser.login(username, PASSWORD).getStatusCode()).isEqualTo(HttpStatus.OK);
+            var own = browser.get("/api/users").getBody().get(0);
+            assertThat(own.get("displayName").asText()).isEqualTo("山田 太郎");
+            assertThat(own.get("monthlyBudget").asText()).isEqualTo("12345.67");
+            assertThat(own.get("email").asText()).isEqualTo("contact@example.com");
+            var other = new Browser();
+            other.refreshCsrf();
+            assertThat(other.login("contact@example.com", PASSWORD).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    /** 验证可选资料及偏好未填写时使用明确默认值，且注册成功不会自动登录。 */
+    @Test
+    void registrationDefaultsOptionalProfileAndPreferences() {
+        var browser = new Browser();
+        browser.refreshCsrf();
+        assertThat(browser.register("registration-defaults", PASSWORD, PASSWORD).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        var account = userDao.findByUsername("registration-defaults").orElseThrow();
+        assertThat(account.email()).isEmpty();
+        assertThat(account.phone()).isEmpty();
+        assertThat(account.currency()).isEqualTo("JPY");
+        assertThat(account.timezone()).isEqualTo("Asia/Tokyo");
+        assertThat(account.monthlyBudget()).isNull();
+        assertThat(account.budgetStartDay()).isEqualTo(1);
+        assertThat(browser.get("/api/auth/me").getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    /** 验证姓名、联系方式、币种、时区和预算非法时拒绝注册，不保存部分账号或舍入预算。 */
+    @Test
+    void registrationRejectsInvalidProfileAndBookkeepingPreferences() {
+        var browser = new Browser();
+        browser.refreshCsrf();
+        var base = Map.<String, Object>of("username", "registration-bad-profile", "displayName", "测试用户",
+                "password", PASSWORD, "confirmPassword", PASSWORD);
+        var missingName = new java.util.HashMap<>(base);
+        missingName.remove("displayName");
+        assertThat(browser.post("/api/auth/register", missingName).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        for (var field : List.of(Map.of("displayName", " "), Map.of("displayName", "x".repeat(81)),
+                Map.of("displayName", "invalid\nname"), Map.of("email", "not-an-email"),
+                Map.of("phone", "not-a-phone"), Map.of("currency", "ABC"), Map.of("currency", "XXX"),
+                Map.of("timezone", "Invalid/Timezone"), Map.of("budgetStartDay", 0), Map.of("budgetStartDay", 29),
+                Map.of("monthlyBudget", "-1"), Map.of("monthlyBudget", "1.1"),
+                Map.of("currency", "CNY", "monthlyBudget", "1.234"), Map.of("monthlyBudget", "1000000000000"))) {
+            var payload = new java.util.HashMap<>(base);
+            payload.putAll(field);
+            assertThat(browser.post("/api/auth/register", payload).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(userDao.findByUsername("registration-bad-profile")).isEmpty();
+        }
     }
 
     /**
@@ -101,7 +172,9 @@ class AuthIntegrationTests {
                 Map.of("username", "registration-invalid", "password", PASSWORD, "confirmPassword", "Mismatch-password"),
                 Map.of("username", "registration-invalid", "password", "密".repeat(25), "confirmPassword", "密".repeat(25)),
                 Map.of("username", "registration-invalid", "password", "x".repeat(73), "confirmPassword", "x".repeat(73)))) {
-            var result = browser.post("/api/auth/register", body);
+            var payload = new java.util.HashMap<>(body);
+            payload.put("displayName", "注册测试用户");
+            var result = browser.post("/api/auth/register", payload);
             assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
             assertThat(result.getBody().get("code").asText()).isEqualTo("INVALID_REQUEST");
         }
@@ -338,7 +411,7 @@ class AuthIntegrationTests {
          * 将用户名、密码和确认密码发送到注册接口，返回原始响应供用例断言。
          */
         ResponseEntity<JsonNode> register(String username, String password, String confirmPassword) {
-            return post("/api/auth/register", Map.of("username", username,
+            return post("/api/auth/register", Map.of("username", username, "displayName", "注册测试用户",
                     "password", password, "confirmPassword", confirmPassword));
         }
 

@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Smart Finance API",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "description": "Smart Finance uses a JSESSIONID cookie and CSRF protection.\nFirst GET /api/auth/csrf and retain its cookie. Send the returned token in\nX-CSRF-TOKEN for registration, login and logout. Registration creates an\naccount without signing in; log in separately and refresh CSRF after login.\n"
   },
   "paths": {
@@ -60,7 +60,7 @@
         ],
         "operationId": "register",
         "summary": "注册账号",
-        "description": "创建账号，不自动登录。username 为 1–64 个非空白字符；password 至少\n8 个字符、最多 72 个 UTF-8 字节，且不能全为空白；confirmPassword\n必须与 password 完全一致。密码仅以 BCrypt 哈希保存。\n",
+        "description": "创建账号，不自动登录。displayName 为独立的姓名或昵称，1–80 个字符；username 为唯一登录账号，\n支持普通用户名、中文用户名、数字账号或邮箱形式，1–64 个非空白字符，不要求邮箱格式。\nemail 和 phone 为可选联系资料，未填写时保存为空字符串，联系邮箱不是额外登录账号。\ncurrency、timezone、monthlyBudget、budgetStartDay 保存记账偏好；金额以十进制字符串传递，\n不表示现有演示账目已开启预算计算或多币种换算。password 至少\n8 个字符、最多 72 个 UTF-8 字节，且不能全为空白；confirmPassword\n必须与 password 完全一致。密码仅以 BCrypt 哈希保存。\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/CsrfHeader"
@@ -448,7 +448,14 @@
           "createdBy",
           "updatedAt",
           "updatedBy",
-          "isDeleted"
+          "isDeleted",
+          "displayName",
+          "email",
+          "phone",
+          "currency",
+          "timezone",
+          "monthlyBudget",
+          "budgetStartDay"
         ],
         "properties": {
           "id": {
@@ -485,6 +492,41 @@
           "isDeleted": {
             "type": "boolean",
             "description": "是否逻辑删除；用户一览只返回未删除账号，因此此字段为 false"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "姓名或昵称，与登录账号独立，可以重名"
+          },
+          "email": {
+            "type": "string",
+            "description": "联系邮箱，未填写时为空字符串，不作为登录账号别名"
+          },
+          "phone": {
+            "type": "string",
+            "description": "联系手机号，未填写时为空字符串"
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "pattern": "[A-Z]{3}",
+            "description": "ISO 4217 记账币种，默认 JPY，不允许无货币用途的代码"
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "有效 IANA 时区，默认 Asia/Tokyo"
+          },
+          "monthlyBudget": {
+            "type": "string",
+            "pattern": "^$|^[0-9]{1,12}(\\.[0-9]{1,4})?$",
+            "description": "可选月度预算，十进制金额字符串，最多 12 位整数；小数位不得超过所选币种精度，未设置为空字符串"
+          },
+          "budgetStartDay": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 28,
+            "description": "每月预算周期起始日，默认 1，范围 1–28"
           }
         }
       },
@@ -493,7 +535,8 @@
         "required": [
           "username",
           "password",
-          "confirmPassword"
+          "confirmPassword",
+          "displayName"
         ],
         "properties": {
           "username": {
@@ -501,7 +544,26 @@
             "minLength": 1,
             "maxLength": 64,
             "pattern": "\\S+",
-            "description": "用户名，不允许包含空白"
+            "description": "唯一登录账号，支持普通用户名、中文用户名、数字或邮箱形式，不允许包含空白"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "[^\\x00-\\x1F\\x7F]+",
+            "description": "姓名或昵称，不能为空或全为空白，不能包含控制字符，可以重名"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "pattern": "^$|^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+            "description": "可选联系邮箱；未填写时可省略或传空字符串，不作为额外登录账号"
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 32,
+            "pattern": "^$|^\\+?[0-9][0-9 ()-]{5,29}[0-9]$",
+            "description": "可选联系手机号；支持国际区号、空白、括号和连字符，填写时为 7–32 个字符"
           },
           "password": {
             "type": "string",
@@ -518,6 +580,29 @@
             "minLength": 8,
             "maxLength": 72,
             "description": "必须与 password 完全一致"
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "pattern": "[A-Z]{3}",
+            "description": "ISO 4217 记账币种，默认 JPY，不允许无货币用途的代码"
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "有效 IANA 时区，默认 Asia/Tokyo"
+          },
+          "monthlyBudget": {
+            "type": "string",
+            "pattern": "^$|^[0-9]{1,12}(\\.[0-9]{1,4})?$",
+            "description": "可选月度预算，十进制金额字符串，最多 12 位整数；小数位不得超过所选币种精度，未设置为空字符串"
+          },
+          "budgetStartDay": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 28,
+            "description": "每月预算周期起始日，默认 1，范围 1–28"
           }
         }
       },

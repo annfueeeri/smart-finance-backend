@@ -35,7 +35,10 @@ public class UserManagementController implements UsersApi {
     private UserSummary summary(UserAccount account) {
         return new UserSummary(account.id(), account.username(), Role.fromValue(account.role().name()),
                 account.enabled(), account.createdAt().toString(), account.createdBy(),
-                account.updatedAt().toString(), account.updatedBy(), account.deleted());
+                account.updatedAt().toString(), account.updatedBy(), account.deleted(),
+                account.displayName(), account.email(), account.phone(), account.currency(), account.timezone(),
+                account.monthlyBudget() == null ? "" : account.monthlyBudget().stripTrailingZeros().toPlainString(),
+                account.budgetStartDay());
     }
 
     /**

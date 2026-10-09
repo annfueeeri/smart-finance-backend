@@ -9,9 +9,17 @@ public interface AuthService {
      * @param username 新账号用户名
      * @param password 待哈希保存的明文密码
      * @param confirmPassword 必须与密码完全一致的确认密码
+     * @param displayName 独立的姓名或昵称，必填
+     * @param email 可选联系邮箱，未填写可传 null 或空字符串
+     * @param phone 可选联系手机号，未填写可传 null 或空字符串
+     * @param currency 默认币种，未指定时 JPY
+     * @param timezone 所在时区，未指定时 Asia/Tokyo
+     * @param monthlyBudget 月度预算的十进制字符串，可选，避免浮点精度损失
+     * @param budgetStartDay 预算周期起始日，未指定时为 1，允许 1–28
      * @throws collector.bu.service.RegistrationException 参数不合法或用户名已存在
      */
-    void register(String username, String password, String confirmPassword);
+    void register(String username, String password, String confirmPassword, String displayName, String email,
+            String phone, String currency, String timezone, String monthlyBudget, Integer budgetStartDay);
 
     /**
      * 使用数据库中的账号信息和 BCrypt 密码哈希进行认证，拒绝超过 72 字节的密码。
