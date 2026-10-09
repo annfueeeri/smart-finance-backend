@@ -96,4 +96,6 @@ public interface UserDao {
      * @param actor 由后端认证上下文确定的实际操作者用户名
      */
     void updateRole(long id, UserRole role, String actor);
+    /** 锁定当前用户行，必须在事务内调用；串行化本人流水、预算、转账和估值写入。 */
+    void lockUser(long userId);
 }

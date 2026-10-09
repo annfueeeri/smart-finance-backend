@@ -1,9 +1,12 @@
 package collector.bu;
 
-import collector.bu.budget.*;
+import collector.bu.exception.BudgetException;
+import collector.bu.model.ledger.LedgerModels;
+import collector.bu.service.budget.BudgetService;
+import collector.bu.service.ledger.LedgerService;
+
 import collector.bu.dao.UserDao;
 import collector.bu.entity.UserRole;
-import collector.bu.ledger.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.*;
 import java.util.*;
@@ -16,7 +19,7 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import static collector.bu.budget.BudgetModels.*;
+import static collector.bu.model.budget.BudgetModels.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -24,7 +27,6 @@ import static org.mockito.Mockito.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"spring.datasource.url=jdbc:h2:mem:budgettests;MODE=MySQL;DB_CLOSE_DELAY=-1","budget.refresh-delay-ms=3600000"})
 class BudgetIntegrationTests {
     @Autowired BudgetService budgets;
-    @Autowired BudgetDao dao;
     @Autowired LedgerService ledger;
     @Autowired UserDao users;
     @Autowired JdbcTemplate jdbc;

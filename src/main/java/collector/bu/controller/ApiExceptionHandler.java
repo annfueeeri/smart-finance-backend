@@ -1,9 +1,9 @@
 package collector.bu.controller;
 
 import collector.bu.controller.model.ErrorResponse;
-import collector.bu.service.RegistrationException;
-import collector.bu.service.UserManagementException;
-import collector.bu.ledger.LedgerException;
+import collector.bu.exception.RegistrationException;
+import collector.bu.exception.UserManagementException;
+import collector.bu.exception.LedgerException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,8 +16,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class ApiExceptionHandler {
     /** 将预算归属、参数和配置冲突分别转换为 404、400、409，不泄露内部 SQL。 */
-    @ExceptionHandler(collector.bu.budget.BudgetException.class)
-    public ResponseEntity<ErrorResponse> budgetFailed(collector.bu.budget.BudgetException exception) {
+    @ExceptionHandler(collector.bu.exception.BudgetException.class)
+    public ResponseEntity<ErrorResponse> budgetFailed(collector.bu.exception.BudgetException exception) {
         var status=switch(exception.code()) { case "BUDGET_NOT_FOUND" -> HttpStatus.NOT_FOUND; case "BUDGET_CONFLICT" -> HttpStatus.CONFLICT; default -> HttpStatus.BAD_REQUEST; };
         return ResponseEntity.status(status).body(new ErrorResponse(exception.code(),"预算参数不合法、记录不存在或配置冲突"));
     }

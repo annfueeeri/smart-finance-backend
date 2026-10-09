@@ -1,7 +1,7 @@
 package collector.bu.service.impl;
 
 import collector.bu.service.AuthService;
-import collector.bu.service.RegistrationException;
+import collector.bu.exception.RegistrationException;
 import collector.bu.dao.UserDao;
 import collector.bu.entity.UserRole;
 import java.nio.charset.StandardCharsets;
@@ -49,7 +49,7 @@ public class AuthServiceImpl implements AuthService {
      * @param timezone 有效 IANA 时区，未指定时 Asia/Tokyo
      * @param monthlyBudget 可选十进制月度预算，不能为负，小数位不能超出所选币种精度
      * @param budgetStartDay 每月预算起始日，1–28，未指定时为 1
-     * @throws collector.bu.service.RegistrationException 参数不合法或用户名已存在
+     * @throws collector.bu.exception.RegistrationException 参数不合法或用户名已存在
      */
     @Override
     @Transactional

@@ -1,9 +1,14 @@
 package collector.bu;
 
+import collector.bu.exception.LedgerException;
+import collector.bu.service.ledger.LedgerFiles;
+import collector.bu.service.ledger.LedgerService;
+import collector.bu.service.report.AccountingService;
+import collector.bu.service.report.ReportExport;
+import collector.bu.service.report.ReportService;
+
 import collector.bu.dao.UserDao;
 import collector.bu.entity.UserRole;
-import collector.bu.ledger.*;
-import collector.bu.report.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDate;
 import java.util.*;
@@ -18,8 +23,8 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.text.PDFTextStripper;
 import static org.assertj.core.api.Assertions.*;
-import static collector.bu.ledger.LedgerModels.*;
-import static collector.bu.report.ReportModels.*;
+import static collector.bu.model.ledger.LedgerModels.*;
+import static collector.bu.model.report.ReportModels.*;
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"spring.datasource.url=jdbc:h2:mem:reporttests;MODE=MySQL;DB_CLOSE_DELAY=-1","app.budget.scheduler-delay-ms=3600000"})
 class ReportIntegrationTests {
@@ -33,7 +38,7 @@ class ReportIntegrationTests {
     @Autowired ReportExport exports;
     @Autowired LedgerFiles files;
     @Autowired com.fasterxml.jackson.databind.ObjectMapper mapper;
-    @Autowired collector.bu.budget.BudgetService budgets;
+    @Autowired collector.bu.service.budget.BudgetService budgets;
     private static final String USER="report-test-user",ADMIN="report-test-admin",PASSWORD="Report-testing-password-123";
     /** 按外键依赖清理本人财务测试数据，管理员保留独立身份验证隔离。 */
     @BeforeEach void setup(){
@@ -126,7 +131,7 @@ class ReportIntegrationTests {
     /** 验证带标签CSV可往返并识别标准化重复，转账不消耗预算，日均金额仅舍入一次。 */
     @Test void taggedImportRoundTripAndTransfersLeaveBudgetsUnchanged() throws Exception {
         long id=account("Bank","BANK","0"),other=account("Cash","CASH","0");
-        var input=new collector.bu.budget.BudgetModels.Input("Monthly","TOTAL","JPY","MONTH",LocalDate.of(2026,10,1),LocalDate.of(2026,10,31),"100",List.of(50,80,100),"NONE");
+        var input=new collector.bu.model.budget.BudgetModels.Input("Monthly","TOTAL","JPY","MONTH",LocalDate.of(2026,10,1),LocalDate.of(2026,10,31),"100",List.of(50,80,100),"NONE");
         budgets.create(USER,input);accounting.transfer(USER,new TransferInput(id,other,"999",LocalDate.of(2026,10,2),""));
         assertThat(budgets.overview(USER,LocalDate.of(2026,10,1),LocalDate.of(2026,10,31)).items().get(0).spent()).isEqualTo("0");
         entry(id,"EXPENSE","10","2026-10-02","FOOD","Store"," 家庭 ","旅行","家庭");

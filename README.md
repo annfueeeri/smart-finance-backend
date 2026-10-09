@@ -109,7 +109,7 @@ WHERE username = '指定的管理员用户名' AND enabled = TRUE AND is_deleted
 
 | 层 | 代码 | 职责 |
 | --- | --- | --- |
-| Controller | `controller/AuthController.java` | 实现生成的 AuthApi，接收请求、调用 Service、处理 Session 与响应 |
+| Controller | `controller/auth/AuthController.java` | 实现生成的 AuthApi，接收请求、调用 Service、处理 Session 与响应 |
 | Service | `service/AuthService.java`、`service/impl/AuthServiceImpl.java`、`service/impl/DatabaseUserDetailsService.java` | 认证、密码与账号状态检查，通过 UserDao 加载账号 |
 | DAO | `dao/UserDao.java`、`dao/impl/JdbcUserDao.java` | 参数化 SQL 查询和插入用户 |
 
@@ -394,3 +394,53 @@ PDF极少数不支持的字形显示问号，原文字在JSON/CSV/XLSX保留；�
 新增ledger_transfer、account_valuation均有主键、创建/修改时间及用户、is_deleted及所有者复合外键。
 local H2自动初始化所有业务表；生产MySQL需手动迁移，当前验证使用H2 MySQL模式。
 可直接在本地查看`docs/smart-finance-openapi.json`，它由规范api.yaml生成并与前端路径、参数一致。
+
+
+### 按层与模块整理后的项目结构
+
+手写源代码位于 `src/main/java/collector/bu/`：
+
+```text
+controller/                 HTTP请求、参数绑定与响应
+  auth/AuthController.java
+  user/UserManagementController.java
+  ledger/LedgerController.java
+  budget/BudgetController.java
+  report/AccountingController.java
+  report/ReportController.java
+  HealthController.java
+  ApiExceptionHandler.java
+service/                    业务校验、权限复查和事务协调
+  ledger/                   收支与文件导入导出
+  budget/                   预算、结转、提醒和调整历史协调
+  report/                   账户辅助业务、统计计算与报表导出
+  impl/                     认证与用户管理实现
+  AuthService.java
+  UserManagementService.java
+dao/                        按模块独立的数据访问文件
+  UserDao.java
+  impl/JdbcUserDao.java
+  AccountDao.java
+  TransactionDao.java
+  TransferDao.java
+  AccountValuationDao.java
+  BudgetDao.java
+  BudgetAdjustmentDao.java
+  BudgetTemplateDao.java
+  BudgetNotificationDao.java
+  ReportDao.java
+entity/                     数据库实体，账户和流水位于ledger子包
+model/                      ledger/budget/report请求、响应及统计结构
+exception/                  统一业务异常
+config/                     安全配置及budget定时任务
+support/ledger/             共享交易标签编解码，不执行SQL
+```
+
+每个DAO仅负责对应模块的数据访问；财务报表DAO只读聚合，不负责转账或估值写入。
+真实支出汇总和交易标签查询由TransactionDao提供；预算方案、调整历史、模板和通知分别持久化。
+导入导出没有独立业务表，复用流水DAO，文件解析和生成留在Service。
+跨DAO操作由Service在原有事务内协调，预算调整/结转与历史快照原子保存。
+用户行锁统一由UserDao提供，同一用户并发流水、预算、转账、估值写入继续串行化。
+DAO保持参数化SQL、用户归属筛选、逻辑删除条件及审计字段；Controller只调用Service。
+本次仅重构Java包与职责，HTTP路径、参数、JSON文档和数据库结构不变，无需新增迁移。
+OpenAPI接口和模型仍由Maven生成到target/generated-sources/openapi，勿手动移动生成文件。

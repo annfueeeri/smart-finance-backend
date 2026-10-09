@@ -29,7 +29,7 @@ public interface UserManagementService {
      * @param id 目标账号的数据库 ID
      * @param role 要写入的新身份
      * @return 修改后的内部账号数据，包含密码哈希，不能直接作为接口响应
-     * @throws collector.bu.service.UserManagementException 目标不存在或会失去最后一个启用的管理员
+     * @throws collector.bu.exception.UserManagementException 目标不存在或会失去最后一个启用的管理员
      * @throws org.springframework.security.access.AccessDeniedException 操作者不是启用的管理员
      */
     UserAccount updateRole(String actor, long id, UserRole role);

@@ -121,4 +121,7 @@ public class JdbcUserDao implements UserDao {
                 + "WHERE id = ? AND is_deleted = FALSE",
                 role.name(), actor, id);
     }
+    /** 锁定当前用户行，使同一用户并发导入的重复检测和入库按顺序执行。 */
+    @Override
+    public void lockUser(long userId) { jdbc.queryForObject("SELECT id FROM app_user WHERE id=? FOR UPDATE", Long.class,userId); }
 }

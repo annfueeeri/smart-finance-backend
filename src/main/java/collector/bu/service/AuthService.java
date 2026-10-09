@@ -16,7 +16,7 @@ public interface AuthService {
      * @param timezone 所在时区，未指定时 Asia/Tokyo
      * @param monthlyBudget 月度预算的十进制字符串，可选，避免浮点精度损失
      * @param budgetStartDay 预算周期起始日，未指定时为 1，允许 1–28
-     * @throws collector.bu.service.RegistrationException 参数不合法或用户名已存在
+     * @throws collector.bu.exception.RegistrationException 参数不合法或用户名已存在
      */
     void register(String username, String password, String confirmPassword, String displayName, String email,
             String phone, String currency, String timezone, String monthlyBudget, Integer budgetStartDay);
