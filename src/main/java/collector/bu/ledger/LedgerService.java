@@ -18,8 +18,9 @@ import static collector.bu.ledger.LedgerModels.*;
 public class LedgerService {
     private final UserDao users;
     private final LedgerDao ledger;
+    private final collector.bu.budget.BudgetService budgets;
     /** 注入数据库账号和个人账本访问组件。 */
-    public LedgerService(UserDao users, LedgerDao ledger) { this.users=users; this.ledger=ledger; }
+    public LedgerService(UserDao users, LedgerDao ledger, collector.bu.budget.BudgetService budgets) { this.users=users; this.ledger=ledger; this.budgets=budgets; }
     /** 从数据库验证当前账号存在、未删除且启用，禁止使用客户端用户 ID。 */
     public UserAccount actor(String username) {
         return users.findByUsername(username).filter(u -> u.enabled() && !u.deleted())
@@ -69,8 +70,11 @@ public class LedgerService {
     public LedgerEntry createEntry(String username, EntryInput input) {
         var user=actor(username);
         var account=validate(username,input);
-        return ledger.createEntry(user.id(),username,account,input.kind(),new BigDecimal(input.amount()),input.date(),
+        ledger.lockUser(user.id());
+        var entry=ledger.createEntry(user.id(),username,account,input.kind(),new BigDecimal(input.amount()),input.date(),
                 input.category(),clean(input.merchant()),clean(input.note()));
+        if(input.kind().equals("EXPENSE"))budgets.refresh(username);
+        return entry;
     }
     /** 查询个人分页记录，日期闭区间筛选，账户筛选也必须属于本人。 */
     @Transactional(readOnly=true)
@@ -87,12 +91,14 @@ public class LedgerService {
     public ImportResult importEntries(String username, ImportInput input) {
         var user=actor(username);
         ledger.lockUser(user.id());
-        int imported=0, skipped=0;
+        int imported=0, skipped=0; boolean expense=false;
         for (var entry : input.entries()) {
-            validate(username,entry);
+            var account=validate(username,entry);
             if (!Boolean.FALSE.equals(input.skipDuplicates()) && ledger.duplicate(user.id(),entry)) { skipped++; continue; }
-            createEntry(username,entry); imported++;
+            ledger.createEntry(user.id(),username,account,entry.kind(),new BigDecimal(entry.amount()),entry.date(),entry.category(),clean(entry.merchant()),clean(entry.note()));
+            imported++; expense=expense || entry.kind().equals("EXPENSE");
         }
+        if(expense)budgets.refresh(username);
         return new ImportResult(imported,skipped);
     }
     /** 检测一条当前用户流水是否已存在，供导入预览使用。 */

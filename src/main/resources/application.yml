@@ -23,3 +23,19 @@ server:
         http-only: true
         same-site: strict
         secure: ${SESSION_COOKIE_SECURE:false}
+
+# 站内通知直接启用；邮件/推送预留服务配置，尚未实现发送，不填写密钥到仓库。
+budget:
+  refresh-delay-ms: ${BUDGET_REFRESH_DELAY_MS:60000}
+  notifications:
+    email:
+      enabled: false
+      smtp-host: ${BUDGET_SMTP_HOST:}
+      smtp-port: ${BUDGET_SMTP_PORT:587}
+      username: ${BUDGET_SMTP_USERNAME:}
+      password: ${BUDGET_SMTP_PASSWORD:}
+      from: ${BUDGET_EMAIL_FROM:}
+    push:
+      enabled: false
+      provider-url: ${BUDGET_PUSH_PROVIDER_URL:}
+      api-key: ${BUDGET_PUSH_API_KEY:}

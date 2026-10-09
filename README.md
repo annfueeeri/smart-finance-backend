@@ -36,7 +36,7 @@ MinIO 客户端依赖已包含；初始项目没有对象存储业务，因此�
 
 ### 业务表公共字段
 
-所有业务表统一包含以下字段；当前业务表为 `app_user`、`ledger_account`、`ledger_transaction`，Spring Batch 框架表保留官方结构。
+所有业务表统一包含以下字段；当前业务表为 `app_user`、`ledger_account`、`ledger_transaction` 及预算表（见下文），Spring Batch 框架表保留官方结构。
 
 | 字段 | 含义 | 规则 |
 | --- | --- | --- |
@@ -295,3 +295,56 @@ XLSX 将全部业务数据保存为字符串单元格。导出列 kind,amount,da
 新 MySQL 安装按顺序执行 `db/schema-users.sql` 和 `db/schema-ledger.sql`。
 迁移不会自动执行；Spring Batch 表保留框架结构。local H2 自动初始化全部业务表，但进程重启仍清空内存数据。
 可下载 JSON 接口文档：`docs/smart-finance-openapi.json`，由 `python3 scripts/export-api-doc.py` 从规范 YAML 生成。
+
+
+### 真实预算管理、结转和站内预警
+
+业务表 `budget_plan`、`budget_adjustment`、`budget_template`、`budget_notification` 均具有
+主键、创建/修改时间及用户、`is_deleted`；预算关联、调整及提醒用复合外键保证用户归属一致。
+通过认证会话确定所有者，管理员也只能操作自己的预算、模板、历史与通知。
+创建/调整/复制/应用模板/标记已读均要求登录后的 CSRF。
+
+| 方法 | 完整路径 | 用途 |
+| --- | --- | --- |
+| GET / POST | `/api/budgets` | 按日期范围重叠筛选执行列表 / 新建预算 |
+| PUT | `/api/budgets/{id}` | 额度、阈值、结转策略调整，理由必填 |
+| GET | `/api/budgets/{id}/adjustments` | 调整前后基础额度及结转修改历史 |
+| GET / POST | `/api/budget-templates` | 本人常用月度方案 / 保存某月全部月度配置 |
+| POST | `/api/budget-templates/{id}/apply` | 原子应用方案到新月份 |
+| POST | `/api/budgets/copy-month` | 复制上月或指定月份配置 |
+| GET | `/api/budgets/history` | 已结束月度预算、分类执行和超支频次 |
+| GET | `/api/budget-notifications` | 最新200条本人站内预警 |
+| PUT | `/api/budget-notifications/{id}/read` | 标记本人通知已读 |
+
+`category=TOTAL` 汇总该币种所有支出，其他预算仅允许支出分类。
+同用户/分类/币种/周期类型/起止日期唯一；模板应用或复制任一配置冲突会整体回滚，已有预算不覆盖。
+额度必须正数十进制字符串，最多12位整数/4位小数并遵循币种最小单位，所有计算采用BigDecimal。
+余额为含结转额度减实际消费，可以为负数；超支金额为差额正部，执行率为支出÷可用额度，超支率为超支÷可用额度。
+支出来自真实流水，区间闭合、同币种、本人账户且未删除，不计收入；已登记的未来日期消费也属于对应周期支出。
+月度按自然月（注册 `budgetStartDay` 可用于手工设定CUSTOM日期，不能隐式改变月度模板周期）；
+WEEK为周一至周日，QUARTER为自然季度，YEAR为自然年，CUSTOM为自定义闭区间。
+日期前后十年以内，周期最长3661天。注册 `monthlyBudget` 仅作为新预算输入建议，不自动建立预算。
+
+仅MONTH支持 `NONE` / `ONCE` / `CUMULATIVE`：
+- ONCE结转 `max(基础金额−当月消费,0)`，收到的旧结转不再次传递；基础金额优先被消费。
+- CUMULATIVE结转 `max(基础金额+收到的结转−当月消费,0)`。
+- NONE不生成下月；如果之前已结转，切换NONE会清零它带给下一月的结转。
+
+下一月缺少预算时复制其基础配置，已存在时只更新结转；结转来源唯一，不会反复增加余额。
+按月份顺序处理整个链，补录历史支出、修改历史金额会修正后续结转并记录前后值。
+同用户的写入、导入、预算更新、结转、通知通过用户行锁串行执行。
+消费创建在同事务中刷新；批量导入完成后刷新一次；后台每分钟按用户时区结转，即使页面关闭仍写站内消息。
+站内预警阈值自定义1–100，最多10个不重复整数；每预算/事件一次（50%、80%、100%各一次，超支单独一次）。
+未开始和已结束预算不创建新的阈值提醒；消息保留当时的消费快照，不因后来增加额度而删除。
+邮件和推送按照本次选择只预留配置，不实现发送。`budget.notifications.email/push.enabled=false`；
+BUDGET_SMTP_HOST/PORT/USERNAME/PASSWORD、BUDGET_EMAIL_FROM、BUDGET_PUSH_PROVIDER_URL/API_KEY仅用于后续接入，
+即使填写这些预留变量当前也不会发信或推送，不要把密钥提交到Git。
+
+预测采用截至用户当地今天的日均消费×周期天数，按币种舍入，至少为周期全部已登记消费；
+过去周期预测等于实际消费，未来周期没有虚构消费。历史查询from/to为YYYY-MM，默认最近12个结束月份，
+只包含已结束MONTH预算；分类统计排除TOTAL，并按分类/币种统计累计预算、支出、超支金额和超支月数。
+
+已有MySQL在V2–V5完成后执行一次 `src/main/resources/db/migration/V6__create_budgets_mysql.sql`。
+新安装依次执行schema-users.sql、schema-ledger.sql、schema-budgets.sql，框架表保留原结构。
+local H2自动初始化；生产MySQL不自动执行迁移。当前云验证使用H2的MySQL模式，未连接生产MySQL。
+接口JSON文档 `docs/smart-finance-openapi.json` 与api.yaml一致，可用于本地对接和字段核对。

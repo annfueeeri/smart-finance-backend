@@ -15,6 +15,13 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    /** 将预算归属、参数和配置冲突分别转换为 404、400、409，不泄露内部 SQL。 */
+    @ExceptionHandler(collector.bu.budget.BudgetException.class)
+    public ResponseEntity<ErrorResponse> budgetFailed(collector.bu.budget.BudgetException exception) {
+        var status=switch(exception.code()) { case "BUDGET_NOT_FOUND" -> HttpStatus.NOT_FOUND; case "BUDGET_CONFLICT" -> HttpStatus.CONFLICT; default -> HttpStatus.BAD_REQUEST; };
+        return ResponseEntity.status(status).body(new ErrorResponse(exception.code(),"预算参数不合法、记录不存在或配置冲突"));
+    }
+
     /** 将收支参数、账户归属及重复账户错误转换为 400、404 或 409，不泄露 SQL 或其他人的账户。 */
     @ExceptionHandler(LedgerException.class)
     public ResponseEntity<ErrorResponse> ledgerFailed(LedgerException exception) {
