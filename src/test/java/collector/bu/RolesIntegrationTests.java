@@ -55,7 +55,7 @@ class RolesIntegrationTests {
         var result = admin.get("/api/admin/users");
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         for (var user : result.getBody()) {
-            assertThat(user.size()).isEqualTo(4);
+            assertThat(user.size()).isEqualTo(9);
             assertThat(user.has("id") && user.has("username") && user.has("role") && user.has("enabled"))
                     .isTrue();
         }
@@ -63,6 +63,49 @@ class RolesIntegrationTests {
         assertThat(changed.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(changed.getBody().get("role").asText()).isEqualTo("ADMIN");
         assertThat(users.findByUsername("role-test-user").orElseThrow().role()).isEqualTo(UserRole.ADMIN);
+    }
+
+    /** 验证用户一览在后端按会话身份限制查询范围，伪造查询参数也无法读取其他账号。 */
+    @Test
+    void userOverviewLimitsRegularUsersToTheirOwnAccount() {
+        assertThat(new Browser().get("/api/users").getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        var regular = signedIn("role-test-user");
+        var result = regular.get("/api/users?username=role-test-admin&role=ADMIN");
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(result.getBody().size()).isEqualTo(1);
+        var self = result.getBody().get(0);
+        assertThat(self.get("username").asText()).isEqualTo("role-test-user");
+        assertThat(self.get("role").asText()).isEqualTo("USER");
+        assertThat(self.get("createdAt").asText()).isNotBlank();
+        assertThat(self.get("createdBy").asText()).isEqualTo("role-test-user");
+        assertThat(self.get("updatedAt").asText()).isNotBlank();
+        assertThat(self.get("updatedBy").asText()).isEqualTo("role-test-user");
+        assertThat(self.get("isDeleted").asBoolean()).isFalse();
+        assertThat(self.size()).isEqualTo(9);
+
+        var admin = signedIn("role-test-admin");
+        var all = admin.get("/api/users");
+        assertThat(all.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(all.getBody().findValuesAsText("username")).contains("role-test-admin", "role-test-user");
+        for (var entry : all.getBody()) {
+            assertThat(entry.has("password") || entry.has("passwordHash") || entry.has("password_hash")).isFalse();
+        }
+    }
+
+    /** 验证提升、降级在原会话的用户一览查询立即生效，不依赖重新登录或前端隐藏。 */
+    @Test
+    void userOverviewScopeChangesWithDatabaseRoleInExistingSession() {
+        var regular = signedIn("role-test-user");
+        var admin = signedIn("role-test-admin");
+        assertThat(regular.get("/api/users").getBody().size()).isEqualTo(1);
+        assertThat(admin.put(id("role-test-user"), "ADMIN").getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(regular.get("/api/users").getBody().findValuesAsText("username"))
+                .contains("role-test-user", "role-test-admin");
+        assertThat(admin.put(id("role-test-user"), "USER").getStatusCode()).isEqualTo(HttpStatus.OK);
+        var own = regular.get("/api/users").getBody();
+        assertThat(own.size()).isEqualTo(1);
+        assertThat(own.get(0).get("username").asText()).isEqualTo("role-test-user");
+        assertThat(own.get(0).get("updatedBy").asText()).isEqualTo("role-test-admin");
     }
 
     /** 验证注册审计信息由后端生成，客户端不能伪造创建用户、时间或删除状态。 */
@@ -115,6 +158,7 @@ class RolesIntegrationTests {
         jdbc.update("UPDATE app_user SET is_deleted = TRUE, updated_by = ? WHERE id = ?",
                 "role-test-admin", userId);
         assertThat(user.get("/api/auth/me").getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(user.get("/api/users").getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         var fresh = new Browser();
         fresh.csrf();
         assertThat(fresh.exchange("/api/auth/login", HttpMethod.POST,

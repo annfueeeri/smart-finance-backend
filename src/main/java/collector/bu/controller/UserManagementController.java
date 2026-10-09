@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 @RestController
-@RequestMapping(value = "/api/admin/users", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(produces = MediaType.APPLICATION_JSON_VALUE)
 public class UserManagementController implements UsersApi {
     private final UserManagementService users;
 
@@ -30,11 +30,24 @@ public class UserManagementController implements UsersApi {
     /**
      * 将数据库账号转换为可公开的用户摘要，过滤掉密码哈希。
      * @param account 业务层返回的内部账号数据
-     * @return 用户 ID、用户名、身份和启用状态
+     * @return 用户基本信息及创建、修改审计信息，不含密码哈希
      */
     private UserSummary summary(UserAccount account) {
         return new UserSummary(account.id(), account.username(), Role.fromValue(account.role().name()),
-                account.enabled());
+                account.enabled(), account.createdAt().toString(), account.createdBy(),
+                account.updatedAt().toString(), account.updatedBy(), account.deleted());
+    }
+
+    /**
+     * 处理 GET /api/users，管理员查看全部未删除用户，一般用户只查看自己的信息。
+     * 查询范围由业务层从数据库身份决定，禁止依赖前端过滤隐藏其他用户。
+     * @return HTTP 200，返回当前账号可见的用户信息和审计字段
+     */
+    @Override
+    @GetMapping("/api/users")
+    public ResponseEntity<List<UserSummary>> listVisibleUsers() {
+        return ResponseEntity.ok(users.listVisibleUsers(SecurityContextHolder.getContext().getAuthentication().getName())
+                .stream().map(this::summary).toList());
     }
 
     /**
@@ -43,7 +56,7 @@ public class UserManagementController implements UsersApi {
      * @return HTTP 200，返回用户摘要列表
      */
     @Override
-    @GetMapping
+    @GetMapping("/api/admin/users")
     public ResponseEntity<List<UserSummary>> listUsers() {
         return ResponseEntity.ok(users.listUsers(SecurityContextHolder.getContext().getAuthentication().getName())
                 .stream().map(this::summary).toList());
@@ -58,7 +71,7 @@ public class UserManagementController implements UsersApi {
      * @return HTTP 200，返回修改后的用户摘要
      */
     @Override
-    @PutMapping(value = "/{id}/role", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PutMapping(value = "/api/admin/users/{id}/role", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<UserSummary> updateUserRole(Long id, String csrfToken, RoleUpdateRequest body) {
         return ResponseEntity.ok(summary(users.updateRole(
                 SecurityContextHolder.getContext().getAuthentication().getName(), id,

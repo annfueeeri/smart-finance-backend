@@ -134,6 +134,30 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /api/users:
+    get:
+      tags: [Users]
+      operationId: listVisibleUsers
+      summary: 查询当前用户可见的用户一览
+      description: |
+        使用当前会话的数据库身份决定查询范围。管理员查看全部未删除账号，一般用户仅查看自己。
+        返回主键、用户名、身份、启用状态、创建及修改审计信息和删除标记，不返回密码或密码哈希。
+        不接受指定其他用户的查询参数；被降级的管理员下一次请求即只返回自己的信息。
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: 当前用户可见的用户列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /api/admin/users:
     get:
       tags: [Users]
@@ -252,7 +276,7 @@ components:
           $ref: '#/components/schemas/Role'
     UserSummary:
       type: object
-      required: [id, username, role, enabled]
+      required: [id, username, role, enabled, createdAt, createdBy, updatedAt, updatedBy, isDeleted]
       properties:
         id:
           type: integer
@@ -263,6 +287,23 @@ components:
           $ref: '#/components/schemas/Role'
         enabled:
           type: boolean
+        createdAt:
+          type: string
+          description: 数据库创建时间，ISO 本地日期时间格式，不包含时区偏移
+          example: '2026-10-09T12:30:00.123456'
+        createdBy:
+          type: string
+          description: 创建用户名或 SYSTEM、LEGACY 标记
+        updatedAt:
+          type: string
+          description: 数据库修改时间，ISO 本地日期时间格式，不包含时区偏移
+          example: '2026-10-09T12:30:00.123456'
+        updatedBy:
+          type: string
+          description: 最后修改用户名或 SYSTEM、LEGACY 标记
+        isDeleted:
+          type: boolean
+          description: 是否逻辑删除；用户一览只返回未删除账号，因此此字段为 false
     RegisterRequest:
       type: object
       required: [username, password, confirmPassword]

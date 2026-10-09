@@ -17,7 +17,7 @@ mvn spring-boot:run
 OpenAPI 定义位于 `src/main/resources/api.yaml`，接口在构建时生成到 `target/generated-sources/openapi`。
 Controller 层也显式声明路由，便于直接查看：`AuthController` 的公共前缀为 `/api/auth`，
 方法使用 `@GetMapping` 或 `@PostMapping` 声明 `/csrf`、`/register`、`/login`、`/me`、`/logout`；
-`UserManagementController` 的前缀为 `/api/admin/users`，声明 GET 用户列表和 PUT `/{id}/role`；
+`UserManagementController` 的方法分别显式声明 GET `/api/users`、GET `/api/admin/users` 和 PUT `/api/admin/users/{id}/role`；
 `HealthController` 声明 GET `/api/health`。完整路径由类前缀与方法路径组成。
 Controller 仍实现生成接口，参数绑定和校验约束来自接口定义。
 修改路径时需同时更新 OpenAPI 定义、JSON 文档及前端 `src/api/endpoints.ts`。
@@ -51,7 +51,7 @@ MinIO 客户端依赖已包含；初始项目没有对象存储业务，因此�
 逻辑删除的账号不能登录，已有 Session 在下一次请求失效，也不出现在用户列表中；
 身份修改按用户不存在处理，已删除管理员不计入最后管理员保护的数量。
 已删除账号仍占用原用户名，避免新账号继承原账号身份。此变更补充字段及读取规则，
-当前没有新增删除用户接口。管理员列表接口的现有响应字段保持兼容。
+当前没有新增删除用户接口。用户一览在原有基本字段之外返回创建、修改审计信息和删除状态，不返回密码哈希。
 
 新数据库执行 `src/main/resources/db/schema-users.sql`。
 已有 MySQL 数据库先确认身份字段迁移 V2 已完成，再在启动新版应用前执行一次
@@ -64,8 +64,13 @@ MinIO 客户端依赖已包含；初始项目没有对象存储业务，因此�
 新注册用户一律为 `USER`，注册请求中传入身份也不能自行获得管理员权限。
 注册、登录和当前用户响应为 `{ username, role }`。
 
-管理员在前端“ユーザー管理”页面查看用户，选择身份后点击保存。
-`GET /api/admin/users` 返回 `{ id, username, role, enabled }` 列表；
+前端侧边栏“ユーザー一覧”对管理员和一般用户都显示。
+`GET /api/users` 按当前会话的数据库身份限定查询范围：管理员查看全部未删除用户，一般用户只查看自身。
+返回 `{ id, username, role, enabled, createdAt, createdBy, updatedAt, updatedBy, isDeleted }` 列表，
+其中日期时间为数据库本地时间的 ISO 字符串，不带时区偏移；用户一览只返回 `isDeleted=false` 的账号。
+管理员可在页面修改其他用户身份，自己的行只读；一般用户没有编辑控件。
+身份提升或降级后，原会话的下一次查询立即按新身份决定范围。
+兼容接口 `GET /api/admin/users` 仍仅允许管理员访问，并返回同样的用户摘要；
 `PUT /api/admin/users/{id}/role` 接收 `{ "role": "ADMIN" }` 或 `{ "role": "USER" }`，
 要求登录 Cookie 和 CSRF token。未登录返回 401，一般用户返回 403。
 列表和修改结果不包含密码或密码哈希。
@@ -108,7 +113,7 @@ WHERE username = '指定的管理员用户名' AND enabled = TRUE AND is_deleted
 | Service | `service/AuthService.java`、`service/impl/AuthServiceImpl.java`、`service/impl/DatabaseUserDetailsService.java` | 认证、密码与账号状态检查，通过 UserDao 加载账号 |
 | DAO | `dao/UserDao.java`、`dao/impl/JdbcUserDao.java` | 参数化 SQL 查询和插入用户 |
 
-Controller 不引用 DAO、JdbcTemplate 或用户实体；SQL 仅出现在 DAO。
+Controller 不通过 DAO 或 JdbcTemplate 访问数据库；用户管理 Controller 将业务层返回的内部账号转换为安全响应，SQL 仅出现在 DAO。
 `config/SecurityConfig.java` 配置 Spring Security、BCrypt、CSRF 与会话策略。
 
 | 接口 | 行为 |

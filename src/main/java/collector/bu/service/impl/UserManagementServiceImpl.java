@@ -21,6 +21,20 @@ public class UserManagementServiceImpl implements UserManagementService {
     public UserManagementServiceImpl(UserDao users) { this.users = users; }
 
     /**
+     * 查询用户一览，在后端按数据库当前身份限定范围，不信任前端传入的用户名或身份。
+     * @param actor 安全上下文提供的当前登录用户名
+     * @return 管理员可见全部未删除账号，一般用户仅返回自己
+     * @throws AccessDeniedException 当前账号不存在、被禁用或已删除
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserAccount> listVisibleUsers(String actor) {
+        var account = users.findByUsername(actor).filter(user -> user.enabled() && !user.deleted())
+                .orElseThrow(() -> new AccessDeniedException("Active account required"));
+        return account.role() == UserRole.ADMIN ? users.findAll() : List.of(account);
+    }
+
+    /**
      * 根据数据库实时状态检查操作者是否存在、未删除、已启用且身份为 ADMIN。
      * @param actor 要核实权限的操作者用户名
      * @throws org.springframework.security.access.AccessDeniedException 不具备管理员权限

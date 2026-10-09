@@ -6,6 +6,14 @@ import java.util.List;
 
 public interface UserManagementService {
     /**
+     * 从数据库复查当前登录账号，管理员查看全部未删除账号，一般用户只查看自身。
+     * @param actor 当前登录用户名，来自后端安全上下文
+     * @return 当前账号有权查看的内部账号列表，Controller 需移除密码哈希
+     * @throws org.springframework.security.access.AccessDeniedException 账号不存在、禁用或已删除
+     */
+    List<UserAccount> listVisibleUsers(String actor);
+
+    /**
      * 核实操作者在数据库中仍为未删除且启用的管理员，再读取全部未删除账号。
      * 返回内部账号数据，Controller 必须移除密码哈希后再对外响应。
      * @param actor 当前登录的操作者用户名
