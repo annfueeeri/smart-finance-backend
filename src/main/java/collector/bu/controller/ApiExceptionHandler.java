@@ -3,6 +3,7 @@ package collector.bu.controller;
 import collector.bu.controller.model.ErrorResponse;
 import collector.bu.service.RegistrationException;
 import collector.bu.service.UserManagementException;
+import collector.bu.ledger.LedgerException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,16 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    /** 将收支参数、账户归属及重复账户错误转换为 400、404 或 409，不泄露 SQL 或其他人的账户。 */
+    @ExceptionHandler(LedgerException.class)
+    public ResponseEntity<ErrorResponse> ledgerFailed(LedgerException exception) {
+        var status = switch (exception.reason()) {
+            case ACCOUNT_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case ACCOUNT_DUPLICATE -> HttpStatus.CONFLICT;
+            case INVALID_REQUEST -> HttpStatus.BAD_REQUEST;
+        };
+        return ResponseEntity.status(status).body(new ErrorResponse(exception.reason().name(), "收支资料不合法、账户不存在或重复"));
+    }
     /**
      * 将用户管理业务异常转换为统一 JSON 错误响应。
      * @param exception 用户不存在或最后一个管理员不能降级的业务异常
@@ -60,7 +71,9 @@ public class ApiExceptionHandler {
      * @return HTTP 400，错误码为 INVALID_REQUEST
      */
     @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class,
-            ConstraintViolationException.class})
+            ConstraintViolationException.class, org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+            org.springframework.web.multipart.support.MissingServletRequestPartException.class,
+            org.springframework.web.bind.MissingServletRequestParameterException.class, org.springframework.web.multipart.MultipartException.class})
     public ResponseEntity<ErrorResponse> invalidRequest() {
         return ResponseEntity.badRequest()
                 .body(new ErrorResponse("INVALID_REQUEST", "请求参数不合法"));

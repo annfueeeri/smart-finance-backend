@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Smart Finance API",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "description": "Smart Finance uses a JSESSIONID cookie and CSRF protection.\nFirst GET /api/auth/csrf and retain its cookie. Send the returned token in\nX-CSRF-TOKEN for registration, login and logout. Registration creates an\naccount without signing in; log in separately and refresh CSRF after login.\n"
   },
   "paths": {
@@ -365,6 +365,564 @@
           }
         }
       }
+    },
+    "/api/ledger/options": {
+      "get": {
+        "tags": [
+          "Ledger"
+        ],
+        "operationId": "getLedgerOptions",
+        "summary": "获取本人账户、分类和记账偏好",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerOptions"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/accounts": {
+      "post": {
+        "tags": [
+          "Ledger"
+        ],
+        "operationId": "createLedgerAccount",
+        "summary": "新增本人账户",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerAccount"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "description": "ACCOUNT_DUPLICATE 同名同币种账户已存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LedgerAccountInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transactions": {
+      "get": {
+        "tags": [
+          "Ledger"
+        ],
+        "operationId": "listLedgerEntries",
+        "summary": "按类型、日期闭区间和账户分页查看本人流水",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerEntryPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "本人账户不存在（包括其他人的账户）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INCOME",
+                "EXPENSE"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "accountId",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "minimum": 0
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Ledger"
+        ],
+        "operationId": "createLedgerEntry",
+        "summary": "新增本人收入或支出，账户与类型分类必须对应",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "本人账户不存在（包括其他人的账户）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LedgerEntryInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transactions/import/inspect": {
+      "post": {
+        "tags": [
+          "Ledger"
+        ],
+        "operationId": "ledgerImportInspect",
+        "summary": "读取文件列名与样例",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerInspection"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "UTF-8 CSV（可含 BOM）、XLS 或 XLSX；5MB/500 行/30 列，首行为表头；Excel 首张工作表，不接受公式"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transactions/import/preview": {
+      "post": {
+        "tags": [
+          "Ledger"
+        ],
+        "operationId": "ledgerImportPreview",
+        "summary": "字段映射、逐行预览及重复与异常提示（不写入）",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "mapping"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "UTF-8 CSV（可含 BOM）、XLS 或 XLSX；5MB/500 行/30 列，首行为表头；Excel 首张工作表，不接受公式"
+                  },
+                  "mapping": {
+                    "type": "string",
+                    "description": "LedgerMapping 的 JSON 字符串。账户名称只匹配本人账户，重名需 currency 列区分。日期 YYYY-MM-DD 或 YYYY/M/D；金额正数可有标准千分组；类型和分类接受代码/中日文。"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transactions/import": {
+      "post": {
+        "tags": [
+          "Ledger"
+        ],
+        "operationId": "commitLedgerImport",
+        "summary": "确认导入：重新验证全部记录，默认跳过重复，失败整批回滚",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerImportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "本人账户不存在（包括其他人的账户）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LedgerImportInput"
+              }
+            }
+          }
+        },
+        "description": "相同账户、方向、金额、日期、分类、商家和备注视为重复；仅在本人未删除流水中比较。每批最多500条；前端明确排除预览错误行后提交有效行。创建/修改用户来自认证会话。"
+      }
+    },
+    "/api/transactions/export": {
+      "get": {
+        "tags": [
+          "Ledger"
+        ],
+        "operationId": "exportLedgerEntries",
+        "summary": "导出本人筛选范围内全部流水，最多10000条（超限返回400）",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV（UTF-8 BOM、公式转义）或 XLSX（文字单元格）；列 kind,amount,date,account,category,merchant,note,currency，可重新导入",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "本人账户不存在（包括其他人的账户）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INCOME",
+                "EXPENSE"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "accountId",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "csv",
+                "xlsx"
+              ],
+              "default": "csv"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -673,6 +1231,459 @@
           },
           "message": {
             "type": "string"
+          }
+        }
+      },
+      "LedgerAccount": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "currency",
+          "createdAt",
+          "createdBy",
+          "updatedAt",
+          "updatedBy",
+          "deleted"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "数据库创建时间（服务器时间，无时区后缀）"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "数据库最后修改时间（服务器时间，无时区后缀）"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "是否逻辑删除；当前查询只返回 false"
+          }
+        }
+      },
+      "LedgerAccountInput": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "description": "省略时采用用户默认币种"
+          }
+        }
+      },
+      "LedgerEntryInput": {
+        "type": "object",
+        "required": [
+          "accountId",
+          "kind",
+          "amount",
+          "date",
+          "category"
+        ],
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "INCOME",
+              "EXPENSE"
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^[0-9]{1,12}(\\.[0-9]{1,4})?$",
+            "description": "正数十进制字符串，不超过账户币种最小单位精度；禁止舍入"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "SALARY",
+              "BONUS",
+              "PART_TIME",
+              "INVESTMENT",
+              "INTEREST",
+              "GIFT",
+              "OTHER_INCOME",
+              "FOOD",
+              "SHOPPING",
+              "TRANSPORT",
+              "HOUSING",
+              "ENTERTAINMENT",
+              "MEDICAL",
+              "OTHER_EXPENSE"
+            ]
+          },
+          "merchant": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      },
+      "LedgerEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "accountId",
+          "kind",
+          "amount",
+          "date",
+          "category",
+          "merchant",
+          "note",
+          "currency",
+          "accountName",
+          "createdAt",
+          "createdBy",
+          "updatedAt",
+          "updatedBy",
+          "deleted"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "accountId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "INCOME",
+              "EXPENSE"
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "description": "数据库金额的十进制字符串，可能含四位小数末尾零"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "SALARY",
+              "BONUS",
+              "PART_TIME",
+              "INVESTMENT",
+              "INTEREST",
+              "GIFT",
+              "OTHER_INCOME",
+              "FOOD",
+              "SHOPPING",
+              "TRANSPORT",
+              "HOUSING",
+              "ENTERTAINMENT",
+              "MEDICAL",
+              "OTHER_EXPENSE"
+            ]
+          },
+          "merchant": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "currency": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "数据库创建时间（服务器时间，无时区后缀）"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "数据库最后修改时间（服务器时间，无时区后缀）"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "是否逻辑删除；当前查询只返回 false"
+          }
+        }
+      },
+      "LedgerEntryPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "size"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerEntry"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        }
+      },
+      "LedgerOptions": {
+        "type": "object",
+        "required": [
+          "accounts",
+          "categories",
+          "currency",
+          "timezone",
+          "today"
+        ],
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerAccount"
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "code",
+                "kind",
+                "name"
+              ],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "currency": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "today": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "LedgerMapping": {
+        "type": "object",
+        "required": [
+          "columns"
+        ],
+        "properties": {
+          "columns": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "零起始列索引。允许 amount/date/kind/account/category/merchant/note/currency；amount、date 必须映射。"
+          },
+          "defaultKind": {
+            "type": "string",
+            "enum": [
+              "INCOME",
+              "EXPENSE"
+            ]
+          },
+          "defaultAccountId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "defaultCategory": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "LedgerInspection": {
+        "type": "object",
+        "required": [
+          "headers",
+          "sampleRows",
+          "totalRows"
+        ],
+        "properties": {
+          "headers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sampleRows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "totalRows": {
+            "type": "integer",
+            "maximum": 500
+          }
+        }
+      },
+      "LedgerPreviewRow": {
+        "type": "object",
+        "required": [
+          "rowNumber",
+          "entry",
+          "duplicate",
+          "errors"
+        ],
+        "properties": {
+          "rowNumber": {
+            "type": "integer",
+            "description": "CSV 非空记录号或 Excel 原始行号，含标题行"
+          },
+          "entry": {
+            "$ref": "#/components/schemas/LedgerEntryInput",
+            "nullable": true
+          },
+          "duplicate": {
+            "type": "boolean"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "LedgerPreview": {
+        "type": "object",
+        "required": [
+          "rows",
+          "valid",
+          "duplicates",
+          "invalid"
+        ],
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerPreviewRow"
+            }
+          },
+          "valid": {
+            "type": "integer",
+            "description": "没有错误的行数，含重复行"
+          },
+          "duplicates": {
+            "type": "integer"
+          },
+          "invalid": {
+            "type": "integer"
+          }
+        }
+      },
+      "LedgerImportInput": {
+        "type": "object",
+        "required": [
+          "entries"
+        ],
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerEntryInput"
+            },
+            "minItems": 1,
+            "maxItems": 500
+          },
+          "skipDuplicates": {
+            "type": "boolean",
+            "default": true,
+            "nullable": true,
+            "description": "省略/null/true 默认跳过数据库及本批次重复；false 明确允许重复"
+          }
+        }
+      },
+      "LedgerImportResult": {
+        "type": "object",
+        "required": [
+          "imported",
+          "skipped"
+        ],
+        "properties": {
+          "imported": {
+            "type": "integer"
+          },
+          "skipped": {
+            "type": "integer"
           }
         }
       }

@@ -36,7 +36,7 @@ MinIO 客户端依赖已包含；初始项目没有对象存储业务，因此�
 
 ### 业务表公共字段
 
-所有业务表统一包含以下字段；当前业务表为 `app_user`，Spring Batch 框架表保留官方结构。
+所有业务表统一包含以下字段；当前业务表为 `app_user`、`ledger_account`、`ledger_transaction`，Spring Batch 框架表保留官方结构。
 
 | 字段 | 含义 | 规则 |
 | --- | --- | --- |
@@ -246,8 +246,52 @@ BACKEND_URL=http://127.0.0.1:18080 npm run dev
 金额最多 12 位整数，小数位不能超过币种精度（JPY/KRW 为 0，CNY/USD 为 2），
 以 BigDecimal 和 DECIMAL 保存，禁止浮点舍入。月度预算可以为 0；空值表示未设置预算。
 新增资料和偏好也返回在用户一览中，查询范围继续由管理员/一般用户身份决定。
-这些偏好为后续真实记账提供设置；当前资产与交易演示模块不会据此自动换算金额或生成预算报表。
+这些偏好为后续真实记账提供设置；资产总览仍为演示数据，真实收支模块按账户币种校验金额，但不会自动换算金额或生成预算报表。
 
 已有 MySQL 在 V2、V3 完成后执行一次 `src/main/resources/db/migration/V4__add_user_profile_mysql.sql`。
 姓名暂回填为原账号，邮箱/手机号为空，偏好使用默认值，原主键、密码、身份及审计时间保持不变。
 新安装直接执行 `db/schema-users.sql`。此迁移不自动执行；旧客户端注册请求也必须增加 `displayName`。
+
+
+### 个人账户、收支与导入导出
+
+侧边栏“収支明細”使用真实数据库记录。先创建个人账户（银行、现金、电子钱包等），再记录收入或支出。
+管理员和一般用户均仅可访问自己的财务账户、流水、导入及导出；用户一览的管理员权限不扩展到财务数据。
+所有金额请求及 JSON 响应使用十进制字符串；金额必须为正数，最多 12 位整数和 4 位小数，
+且小数位不得超过账户币种的最小货币单位（例如 JPY 0 位、CNY 2 位）。没有汇率换算。
+收入分类：SALARY 工资、BONUS 奖金、PART_TIME 兼职、INVESTMENT 投资收益、INTEREST 利息、GIFT 红包、OTHER_INCOME 其他收入。
+支出分类：FOOD 餐饮、SHOPPING 购物、TRANSPORT 交通、HOUSING 住房、ENTERTAINMENT 娱乐、MEDICAL 医疗、OTHER_EXPENSE 其他支出。
+每条流水含账户、日期、分类、可选商家和备注，以及主键、创建/修改时间和用户、逻辑删除字段。
+
+| 方法 | 完整路径 | 用途 |
+| --- | --- | --- |
+| GET | `/api/ledger/options` | 本人的账户、分类、币种、时区及当地今天 |
+| POST | `/api/accounts` | 创建个人账户 |
+| POST | `/api/transactions` | 新增个人流水 |
+| GET | `/api/transactions` | 按 kind/start/end/accountId 筛选，page 从 0 开始，size 默认 20、最大 100 |
+| POST | `/api/transactions/import/inspect` | multipart file 读取标题和前 5 行，不写入 |
+| POST | `/api/transactions/import/preview` | multipart file + mapping（JSON 字符串），预览全部行、重复和错误，不写入 |
+| POST | `/api/transactions/import` | JSON entries + skipDuplicates 确认原子导入 |
+| GET | `/api/transactions/export` | format=csv/xlsx，与列表同样筛选；导出全部筛选行，超过 10,000 行返回 400 |
+
+写入接口必须携带登录后的 CSRF 令牌和会话 Cookie。所有归属及审计用户从服务端当前认证账号获取。
+CSV 支持 UTF-8（可带 BOM）；Excel 支持 XLS 和 XLSX，读取第一张工作表，拒绝公式。
+首个非空行为表头；文件最多 5MB、500 条非空数据行、30 列。非法文件或映射返回 400。
+金额和日期必须映射。其他列可映射，也可选择默认方向、本人账户与分类。
+账户列使用账户名称，不会自动创建；同名不同币种账户需映射 currency 列区分。
+日期支持 YYYY-MM-DD、YYYY/M/D；Excel 日期单元格也支持。金额须正数，可含规范的逗号千分组。
+收支和分类接受机器代码、中日文名称；缺少分类默认“其他收入/支出”。
+
+预览返回各原始记录号、规范化字段、errors 和 duplicate。valid 包含无错误的重复行。
+相同账户、方向、金额、日期、分类、商家、备注视为重复，只比较本人未删除流水。
+前端在确认时明确排除错误行；后端重新校验整个提交批次，任一提交行无效则整批回滚。
+`skipDuplicates` 省略、null 或 true 默认跳过重复；明确 false 允许重复，重复金额不会自动合并。
+同一用户的并发导入通过数据库用户行锁串行执行。预览不保证确认时数据状态不变，因此确认会再次查重。
+导出 CSV 包含 UTF-8 BOM，并转义以 `= + - @` 或控制字符开头的文本防止公式执行；重新导入会还原该转义。
+XLSX 将全部业务数据保存为字符串单元格。导出列 kind,amount,date,account,category,merchant,note,currency 可直接重新映射导入。
+
+已有 MySQL 完成 V2/V3/V4 后，在启动新版应用前执行一次
+`src/main/resources/db/migration/V5__create_ledger_mysql.sql`。
+新 MySQL 安装按顺序执行 `db/schema-users.sql` 和 `db/schema-ledger.sql`。
+迁移不会自动执行；Spring Batch 表保留框架结构。local H2 自动初始化全部业务表，但进程重启仍清空内存数据。
+可下载 JSON 接口文档：`docs/smart-finance-openapi.json`，由 `python3 scripts/export-api-doc.py` 从规范 YAML 生成。
