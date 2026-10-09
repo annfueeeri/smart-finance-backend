@@ -22,6 +22,6 @@ public class DatabaseUserDetailsService implements UserDetailsService {
         var account = userDao.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
         return User.withUsername(account.username()).password(account.passwordHash())
-                .authorities("ROLE_USER").disabled(!account.enabled()).build();
+                .roles(account.role().name()).disabled(!account.enabled()).build();
     }
 }

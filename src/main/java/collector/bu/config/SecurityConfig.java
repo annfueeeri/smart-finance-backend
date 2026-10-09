@@ -1,6 +1,7 @@
 package collector.bu.config;
 
 import java.util.List;
+import collector.bu.dao.UserDao;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -21,6 +22,7 @@ import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfAuthenticationStrategy;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
 @Configuration
 public class SecurityConfig {
@@ -55,12 +57,14 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityContextRepository contexts,
-            CsrfTokenRepository csrf, SessionAuthenticationStrategy sessions) throws Exception {
+            CsrfTokenRepository csrf, SessionAuthenticationStrategy sessions, UserDao users) throws Exception {
         return http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/health", "/api/auth/csrf", "/api/auth/login", "/api/auth/register",
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/error").permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
+                .addFilterBefore(new DatabaseRoleFilter(users, contexts), AuthorizationFilter.class)
                 .securityContext(context -> context.securityContextRepository(contexts))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                         .sessionAuthenticationStrategy(sessions))

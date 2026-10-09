@@ -1,6 +1,8 @@
 package collector.bu.service.impl;
 
 import collector.bu.dao.UserDao;
+import collector.bu.entity.UserRole;
+import org.springframework.beans.factory.annotation.Autowired;
 import java.nio.charset.StandardCharsets;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
@@ -18,14 +20,23 @@ public class LocalAccountInitializer implements ApplicationRunner {
     private final PasswordEncoder passwordEncoder;
     private final String username;
     private final String password;
+    private final UserRole role;
 
     public LocalAccountInitializer(UserDao userDao, PasswordEncoder passwordEncoder,
+            String username, String password) {
+        this(userDao, passwordEncoder, username, password, UserRole.USER);
+    }
+
+    @Autowired
+    public LocalAccountInitializer(UserDao userDao, PasswordEncoder passwordEncoder,
             @Value("${LOGIN_BOOTSTRAP_USERNAME:}") String username,
-            @Value("${LOGIN_BOOTSTRAP_PASSWORD:}") String password) {
+            @Value("${LOGIN_BOOTSTRAP_PASSWORD:}") String password,
+            @Value("${LOGIN_BOOTSTRAP_ROLE:USER}") UserRole role) {
         this.userDao = userDao;
         this.passwordEncoder = passwordEncoder;
         this.username = username;
         this.password = password;
+        this.role = role;
     }
 
     @Override
@@ -40,7 +51,7 @@ public class LocalAccountInitializer implements ApplicationRunner {
                     + " and password (at least 8 characters, at most 72 UTF-8 bytes)");
         }
         if (userDao.findByUsername(username).isEmpty()) {
-            userDao.insert(username, passwordEncoder.encode(password));
+            userDao.insert(username, passwordEncoder.encode(password), role);
         }
     }
 }

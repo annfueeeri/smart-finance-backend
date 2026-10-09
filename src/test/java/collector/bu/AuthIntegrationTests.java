@@ -50,7 +50,8 @@ class AuthIntegrationTests {
         var result = browser.register("registration-new", PASSWORD, PASSWORD);
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(result.getBody().get("username").asText()).isEqualTo("registration-new");
-        assertThat(result.getBody().size()).isEqualTo(1);
+        assertThat(result.getBody().size()).isEqualTo(2);
+        assertThat(result.getBody().get("role").asText()).isEqualTo("USER");
         var account = userDao.findByUsername("registration-new").orElseThrow();
         assertThat(account.enabled()).isTrue();
         assertThat(account.passwordHash()).isNotEqualTo(PASSWORD);
@@ -144,7 +145,8 @@ class AuthIntegrationTests {
         var result = browser.login("login-test", PASSWORD);
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(result.getBody().get("username").asText()).isEqualTo("login-test");
-        assertThat(result.getBody().size()).isEqualTo(1);
+        assertThat(result.getBody().size()).isEqualTo(2);
+        assertThat(result.getBody().get("role").asText()).isEqualTo("USER");
         assertThat(result.getHeaders().get(HttpHeaders.SET_COOKIE).toString())
                 .contains("HttpOnly", "SameSite=Strict");
         assertThat(browser.cookie).isNotEqualTo(originalCookie);

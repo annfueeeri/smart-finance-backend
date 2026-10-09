@@ -26,6 +26,44 @@ OpenAPI 定义位于 `src/main/resources/api.yaml`，接口在构建时生成到
 MySQL profile 不自动创建业务表或 Batch 表；需在数据库预先应用所需 schema。
 MinIO 客户端依赖已包含；初始项目没有对象存储业务，因此无需 MinIO 服务即可运行。
 
+## 用户身份与权限
+
+身份保存在 `app_user.role` 中，取值为 `ADMIN`（管理员）或 `USER`（一般用户）。
+新注册用户一律为 `USER`，注册请求中传入身份也不能自行获得管理员权限。
+注册、登录和当前用户响应为 `{ username, role }`。
+
+管理员在前端“ユーザー管理”页面查看用户，选择身份后点击保存。
+`GET /api/admin/users` 返回 `{ id, username, role, enabled }` 列表；
+`PUT /api/admin/users/{id}/role` 接收 `{ "role": "ADMIN" }` 或 `{ "role": "USER" }`，
+要求登录 Cookie 和 CSRF token。未登录返回 401，一般用户返回 403。
+列表和修改结果不包含密码或密码哈希。
+每次认证请求都会重新读取数据库身份，降级后旧 Session 也不再拥有管理员权限。
+最后一个启用的管理员不能被降级，返回 409 和 `LAST_ADMIN`；并发修改也受此限制。
+
+### 首个管理员
+
+没有固定管理员账号。`local` profile 下，按“本地测试账号”一节安全设置
+`LOGIN_BOOTSTRAP_USERNAME` 和 `LOGIN_BOOTSTRAP_PASSWORD`，再运行：
+
+```sh
+LOGIN_BOOTSTRAP_ROLE=ADMIN mvn spring-boot:run
+```
+
+该设置只影响新创建的本地初始化账号，不会覆盖已有账号的密码或身份。
+未指定时默认 `USER`。本地 H2 内存数据库的账号和身份在后端重启后消失。
+
+MySQL 新安装使用 `src/main/resources/db/schema-users.sql` 创建用户表。
+已有用户表必须在部署前**执行一次**
+`src/main/resources/db/migration/V2__add_user_role_mysql.sql`；此脚本不自动执行，
+请按现有数据库变更流程应用。迁移给原有账号赋予 `USER`，不会丢失账号或密码哈希。
+由可信数据库管理员为指定的已有账号初始化管理员身份，例如将下面的占位用户名替换后执行：
+
+```sql
+UPDATE app_user SET role = 'ADMIN' WHERE username = '指定的管理员用户名' AND enabled = TRUE;
+```
+
+初始化完成后，其余身份修改通过管理员页面进行。当前云环境验证使用 H2，未连接你的 MySQL。
+
 ## 登录与三层结构
 
 登录使用数据库账号、BCrypt 密码哈希和服务端 Session，不返回密码或密码哈希。

@@ -4,6 +4,7 @@ import collector.bu.controller.api.AuthApi;
 import collector.bu.controller.model.CsrfResponse;
 import collector.bu.controller.model.LoginRequest;
 import collector.bu.controller.model.RegisterRequest;
+import collector.bu.controller.model.Role;
 import collector.bu.controller.model.UserResponse;
 import collector.bu.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,7 +43,7 @@ public class AuthController implements AuthApi {
     @Override
     public ResponseEntity<UserResponse> register(String csrfToken, RegisterRequest body) {
         authService.register(body.getUsername(), body.getPassword(), body.getConfirmPassword());
-        return ResponseEntity.status(201).body(new UserResponse(body.getUsername()));
+        return ResponseEntity.status(201).body(new UserResponse(body.getUsername(), Role.USER));
     }
 
     @Override
@@ -53,13 +54,18 @@ public class AuthController implements AuthApi {
         context.setAuthentication(authentication);
         SecurityContextHolder.setContext(context);
         contexts.saveContext(context, request, response);
-        return ResponseEntity.ok(new UserResponse(authService.currentUsername(authentication)));
+        return ResponseEntity.ok(userResponse(authentication));
     }
 
     @Override
     public ResponseEntity<UserResponse> getCurrentUser() {
-        return ResponseEntity.ok(new UserResponse(
-                authService.currentUsername(SecurityContextHolder.getContext().getAuthentication())));
+        return ResponseEntity.ok(userResponse(SecurityContextHolder.getContext().getAuthentication()));
+    }
+
+    private UserResponse userResponse(org.springframework.security.core.Authentication authentication) {
+        var role = authentication.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN")) ? Role.ADMIN : Role.USER;
+        return new UserResponse(authService.currentUsername(authentication), role);
     }
 
     @Override
