@@ -6,7 +6,7 @@ import java.util.*;
 import org.springframework.jdbc.core.*;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Repository;
-import static collector.bu.model.budget.BudgetModels.*;
+import static collector.bu.model.BudgetModels.*;
 
 /** 预算方案模块 SQL：预算创建、查询、额度修改、结转保存及待刷新用户查询。 */
 @Repository

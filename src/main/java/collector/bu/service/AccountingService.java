@@ -1,8 +1,8 @@
 package collector.bu.service;
 
-import collector.bu.entity.ledger.LedgerAccount;
+import collector.bu.entity.LedgerAccount;
 import java.util.List;
-import static collector.bu.model.report.ReportModels.*;
+import static collector.bu.model.ReportModels.*;
 
 /** AccountingService业务接口；Controller及其他业务组件依赖此契约，具体逻辑由impl中的实现提供。 */
 public interface AccountingService {

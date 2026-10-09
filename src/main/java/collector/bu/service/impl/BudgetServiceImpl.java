@@ -11,7 +11,7 @@ import collector.bu.dao.BudgetTemplateDao;
 import collector.bu.dao.BudgetNotificationDao;
 import collector.bu.dao.TransactionDao;
 import collector.bu.entity.UserAccount;
-import collector.bu.model.ledger.LedgerCategory;
+import collector.bu.model.LedgerCategory;
 import java.math.*;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
@@ -20,7 +20,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import static collector.bu.model.budget.BudgetModels.*;
+import static collector.bu.model.BudgetModels.*;
 
 /** 计算个人预算执行、历史对比、结转及站内预警；所有金额按币种精确计算。 */
 @Service

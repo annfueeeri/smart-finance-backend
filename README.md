@@ -109,9 +109,9 @@ WHERE username = '指定的管理员用户名' AND enabled = TRUE AND is_deleted
 
 | 层 | 代码 | 职责 |
 | --- | --- | --- |
-| Controller | `controller/auth/AuthController.java` | 实现生成的 AuthApi，接收请求、调用 Service、处理 Session 与响应 |
+| Controller | `controller/AuthController.java` | 实现生成的 AuthApi，接收请求、调用 Service、处理 Session 与响应 |
 | Service | `service/AuthService.java`、`service/impl/AuthServiceImpl.java`、`service/DatabaseUserDetailsService.java`、`service/impl/DatabaseUserDetailsServiceImpl.java` | 认证、密码与账号状态检查，通过 UserDao 加载账号 |
-| DAO | `dao/UserDao.java`、`dao/impl/JdbcUserDao.java` | 参数化 SQL 查询和插入用户 |
+| DAO | `dao/UserDao.java`、`dao/JdbcUserDao.java` | 参数化 SQL 查询和插入用户 |
 
 Controller 不通过 DAO 或 JdbcTemplate 访问数据库；用户管理 Controller 将业务层返回的内部账号转换为安全响应，SQL 仅出现在 DAO。
 `config/SecurityConfig.java` 配置 Spring Security、BCrypt、CSRF 与会话策略。
@@ -402,12 +402,12 @@ local H2自动初始化所有业务表；生产MySQL需手动迁移，当前验�
 
 ```text
 controller/                 HTTP请求、参数绑定与响应
-  auth/AuthController.java
-  user/UserManagementController.java
-  ledger/LedgerController.java
-  budget/BudgetController.java
-  report/AccountingController.java
-  report/ReportController.java
+  AuthController.java
+  UserManagementController.java
+  LedgerController.java
+  BudgetController.java
+  AccountingController.java
+  ReportController.java
   HealthController.java
   ApiExceptionHandler.java
 service/                    业务校验、权限复查和事务协调
@@ -423,7 +423,7 @@ service/                    业务校验、权限复查和事务协调
   impl/                     与上述接口同名加Impl后缀的实现类
 dao/                        按模块独立的数据访问文件
   UserDao.java
-  impl/JdbcUserDao.java
+  JdbcUserDao.java
   AccountDao.java
   TransactionDao.java
   TransferDao.java
@@ -433,11 +433,11 @@ dao/                        按模块独立的数据访问文件
   BudgetTemplateDao.java
   BudgetNotificationDao.java
   ReportDao.java
-entity/                     数据库实体，账户和流水位于ledger子包
-model/                      ledger/budget/report请求、响应及统计结构
+entity/                     数据库实体及用户身份枚举
+model/                      记账、预算、报表请求、响应及统计结构
 exception/                  统一业务异常
-config/                     安全配置、本地账号初始化及budget定时任务
-support/ledger/             共享交易标签编解码，不执行SQL
+config/                     安全配置、本地账号初始化及预算定时任务
+support/                    共享交易标签编解码，不执行SQL
 ```
 
 每个DAO仅负责对应模块的数据访问；财务报表DAO只读聚合，不负责转账或估值写入。
@@ -471,3 +471,12 @@ DatabaseUserDetailsService继承Spring Security的UserDetailsService，数据库
 LocalAccountInitializer是ApplicationRunner启动组件，位于config；仅local环境按显式配置初始化账号。
 每个接口方法和实现方法均保留说明注释，实现类公开接口方法标记@Override。
 HTTP路径、参数、数据隔离、审计和数据库结构保持原样，本次无需数据库迁移。
+
+
+### 精简不必要的目录
+
+手写Controller统一平铺到controller，按文件名区分认证、用户、记账、预算、账户与财务报表。
+DAO、entity、model、config、support同样直接放在各自层目录，已删除这些层下的模块子目录及空目录。
+JdbcUserDao移到dao根目录；service根目录与service/impl继续保留九组接口/实现对应关系。
+资源字体/许可、数据库迁移、测试、构建脚本及Maven管理的OpenAPI生成目录按其用途保留。
+Java包名、导入和README路径与实际文件位置一致，接口契约及数据库结构保持原样。

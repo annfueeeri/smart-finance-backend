@@ -4,11 +4,11 @@ import collector.bu.service.BudgetService;
 
 import collector.bu.service.LedgerService;
 
-import collector.bu.entity.ledger.LedgerAccount;
-import collector.bu.entity.ledger.LedgerEntry;
+import collector.bu.entity.LedgerAccount;
+import collector.bu.entity.LedgerEntry;
 import collector.bu.exception.LedgerException;
-import collector.bu.model.ledger.LedgerCategory;
-import collector.bu.support.ledger.TransactionTagCodec;
+import collector.bu.model.LedgerCategory;
+import collector.bu.support.TransactionTagCodec;
 
 import collector.bu.dao.UserDao;
 import collector.bu.dao.AccountDao;
@@ -23,7 +23,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import static collector.bu.model.ledger.LedgerModels.*;
+import static collector.bu.model.LedgerModels.*;
 
 /** 复查当前账号并处理个人记账业务，管理员也不获得其他人的财务数据权限。 */
 @Service

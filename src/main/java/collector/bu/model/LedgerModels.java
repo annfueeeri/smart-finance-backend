@@ -1,7 +1,7 @@
-package collector.bu.model.ledger;
+package collector.bu.model;
 
-import collector.bu.entity.ledger.LedgerAccount;
-import collector.bu.entity.ledger.LedgerEntry;
+import collector.bu.entity.LedgerAccount;
+import collector.bu.entity.LedgerEntry;
 
 import jakarta.validation.constraints.*;
 import java.time.LocalDate;

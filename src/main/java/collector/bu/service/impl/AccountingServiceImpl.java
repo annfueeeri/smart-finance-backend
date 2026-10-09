@@ -2,7 +2,7 @@ package collector.bu.service.impl;
 
 import collector.bu.service.AccountingService;
 
-import collector.bu.entity.ledger.LedgerAccount;
+import collector.bu.entity.LedgerAccount;
 import collector.bu.exception.LedgerException;
 import collector.bu.service.LedgerService;
 
@@ -16,7 +16,7 @@ import java.util.*;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import static collector.bu.model.report.ReportModels.*;
+import static collector.bu.model.ReportModels.*;
 
 /** 个人账户资料、日终估值和内部转账业务；这些操作不作为预算消费。 */
 @Service

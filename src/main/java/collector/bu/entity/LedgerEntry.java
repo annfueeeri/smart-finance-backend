@@ -1,4 +1,4 @@
-package collector.bu.entity.ledger;
+package collector.bu.entity;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

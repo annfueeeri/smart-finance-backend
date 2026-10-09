@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.util.*;
 import org.springframework.jdbc.core.*;
 import org.springframework.stereotype.Repository;
-import static collector.bu.model.budget.BudgetModels.*;
+import static collector.bu.model.BudgetModels.*;
 
 /** 预算调整模块 SQL：保存额度/结转前后快照和查询调整历史。 */
 @Repository

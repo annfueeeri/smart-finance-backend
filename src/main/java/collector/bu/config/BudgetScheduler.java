@@ -1,4 +1,4 @@
-package collector.bu.config.budget;
+package collector.bu.config;
 
 import collector.bu.service.BudgetService;
 

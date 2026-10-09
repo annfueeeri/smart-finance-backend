@@ -1,9 +1,9 @@
 package collector.bu.dao;
 
-import collector.bu.entity.ledger.LedgerAccount;
-import collector.bu.entity.ledger.LedgerEntry;
-import collector.bu.model.ledger.LedgerModels;
-import collector.bu.support.ledger.TransactionTagCodec;
+import collector.bu.entity.LedgerAccount;
+import collector.bu.entity.LedgerEntry;
+import collector.bu.model.LedgerModels;
+import collector.bu.support.TransactionTagCodec;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

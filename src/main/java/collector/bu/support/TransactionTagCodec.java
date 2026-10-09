@@ -1,4 +1,4 @@
-package collector.bu.support.ledger;
+package collector.bu.support;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;

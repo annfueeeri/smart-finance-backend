@@ -1,6 +1,6 @@
 package collector.bu.dao;
 
-import collector.bu.entity.ledger.LedgerAccount;
+import collector.bu.entity.LedgerAccount;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -8,7 +8,7 @@ import java.util.*;
 import org.springframework.jdbc.core.*;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Repository;
-import static collector.bu.model.report.ReportModels.*;
+import static collector.bu.model.ReportModels.*;
 
 /** 内部转账模块 SQL：查询和保存本人同币种账户间转账。 */
 @Repository

@@ -1,4 +1,4 @@
-package collector.bu.controller.budget;
+package collector.bu.controller;
 
 import collector.bu.service.BudgetService;
 
@@ -9,7 +9,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-import static collector.bu.model.budget.BudgetModels.*;
+import static collector.bu.model.BudgetModels.*;
 
 /** 预算完整接口路径明确写在每个方法上，身份由认证会话确定，写入受 CSRF 保护。 */
 @RestController

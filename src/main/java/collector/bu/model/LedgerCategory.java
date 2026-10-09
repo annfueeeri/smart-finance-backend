@@ -1,4 +1,4 @@
-package collector.bu.model.ledger;
+package collector.bu.model;
 
 /** 收支分类固定编码及显示名称；收入和支出分类不能互换使用。 */
 public enum LedgerCategory {

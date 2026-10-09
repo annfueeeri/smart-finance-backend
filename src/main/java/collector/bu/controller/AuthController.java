@@ -1,4 +1,4 @@
-package collector.bu.controller.auth;
+package collector.bu.controller;
 
 import collector.bu.controller.api.AuthApi;
 import collector.bu.controller.model.CsrfResponse;

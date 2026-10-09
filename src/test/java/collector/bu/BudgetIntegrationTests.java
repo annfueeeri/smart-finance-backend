@@ -1,7 +1,7 @@
 package collector.bu;
 
 import collector.bu.exception.BudgetException;
-import collector.bu.model.ledger.LedgerModels;
+import collector.bu.model.LedgerModels;
 import collector.bu.service.BudgetService;
 import collector.bu.service.LedgerService;
 
@@ -19,7 +19,7 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import static collector.bu.model.budget.BudgetModels.*;
+import static collector.bu.model.BudgetModels.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;

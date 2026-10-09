@@ -22,7 +22,7 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import static org.assertj.core.api.Assertions.*;
-import static collector.bu.model.ledger.LedgerModels.*;
+import static collector.bu.model.LedgerModels.*;
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT)
 class LedgerIntegrationTests {

@@ -1,6 +1,6 @@
 package collector.bu.service;
 
-import collector.bu.model.report.ReportModels.Report;
+import collector.bu.model.ReportModels.Report;
 
 /** ReportExportService业务接口；Controller及其他业务组件依赖此契约，具体逻辑由impl中的实现提供。 */
 public interface ReportExportService {

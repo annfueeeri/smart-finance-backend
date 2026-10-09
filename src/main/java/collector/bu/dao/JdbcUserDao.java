@@ -1,6 +1,5 @@
-package collector.bu.dao.impl;
+package collector.bu.dao;
 
-import collector.bu.dao.UserDao;
 import collector.bu.entity.UserAccount;
 import collector.bu.entity.UserRole;
 import java.util.List;

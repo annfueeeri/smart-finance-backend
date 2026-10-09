@@ -6,7 +6,7 @@ import java.util.*;
 import org.springframework.jdbc.core.*;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Repository;
-import static collector.bu.model.report.ReportModels.*;
+import static collector.bu.model.ReportModels.*;
 
 /** 余额估值模块 SQL：保存和查询日终余额、投资市值及审计历史。 */
 @Repository

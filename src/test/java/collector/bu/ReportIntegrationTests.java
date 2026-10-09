@@ -23,8 +23,8 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.text.PDFTextStripper;
 import static org.assertj.core.api.Assertions.*;
-import static collector.bu.model.ledger.LedgerModels.*;
-import static collector.bu.model.report.ReportModels.*;
+import static collector.bu.model.LedgerModels.*;
+import static collector.bu.model.ReportModels.*;
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"spring.datasource.url=jdbc:h2:mem:reporttests;MODE=MySQL;DB_CLOSE_DELAY=-1","app.budget.scheduler-delay-ms=3600000"})
 class ReportIntegrationTests {
@@ -131,7 +131,7 @@ class ReportIntegrationTests {
     /** 验证带标签CSV可往返并识别标准化重复，转账不消耗预算，日均金额仅舍入一次。 */
     @Test void taggedImportRoundTripAndTransfersLeaveBudgetsUnchanged() throws Exception {
         long id=account("Bank","BANK","0"),other=account("Cash","CASH","0");
-        var input=new collector.bu.model.budget.BudgetModels.Input("Monthly","TOTAL","JPY","MONTH",LocalDate.of(2026,10,1),LocalDate.of(2026,10,31),"100",List.of(50,80,100),"NONE");
+        var input=new collector.bu.model.BudgetModels.Input("Monthly","TOTAL","JPY","MONTH",LocalDate.of(2026,10,1),LocalDate.of(2026,10,31),"100",List.of(50,80,100),"NONE");
         budgets.create(USER,input);accounting.transfer(USER,new TransferInput(id,other,"999",LocalDate.of(2026,10,2),""));
         assertThat(budgets.overview(USER,LocalDate.of(2026,10,1),LocalDate.of(2026,10,31)).items().get(0).spent()).isEqualTo("0");
         entry(id,"EXPENSE","10","2026-10-02","FOOD","Store"," 家庭 ","旅行","家庭");

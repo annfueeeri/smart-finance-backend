@@ -1,14 +1,14 @@
-package collector.bu.controller.report;
+package collector.bu.controller;
 
 import collector.bu.service.AccountingService;
 
-import collector.bu.entity.ledger.LedgerAccount;
+import collector.bu.entity.LedgerAccount;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-import static collector.bu.model.report.ReportModels.*;
+import static collector.bu.model.ReportModels.*;
 
 /** 账户和内部转账辅助接口，写入会话必须通过CSRF且只能操作本人账户。 */
 @RestController

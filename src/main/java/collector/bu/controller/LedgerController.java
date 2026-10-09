@@ -1,7 +1,7 @@
-package collector.bu.controller.ledger;
+package collector.bu.controller;
 
-import collector.bu.entity.ledger.LedgerAccount;
-import collector.bu.entity.ledger.LedgerEntry;
+import collector.bu.entity.LedgerAccount;
+import collector.bu.entity.LedgerEntry;
 import collector.bu.service.LedgerFileService;
 import collector.bu.service.LedgerService;
 
@@ -11,7 +11,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-import static collector.bu.model.ledger.LedgerModels.*;
+import static collector.bu.model.LedgerModels.*;
 
 /** 个人收支接口，完整路径显式声明，写入请求由安全过滤器验证 CSRF。 */
 @RestController

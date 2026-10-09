@@ -2,9 +2,9 @@ package collector.bu.service.impl;
 
 import collector.bu.service.ReportService;
 
-import collector.bu.entity.ledger.LedgerAccount;
+import collector.bu.entity.LedgerAccount;
 import collector.bu.exception.LedgerException;
-import collector.bu.model.ledger.LedgerCategory;
+import collector.bu.model.LedgerCategory;
 import collector.bu.service.LedgerService;
 
 import collector.bu.dao.AccountDao;
@@ -19,7 +19,7 @@ import java.util.*;
 import java.util.function.Predicate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import static collector.bu.model.report.ReportModels.*;
+import static collector.bu.model.ReportModels.*;
 
 /** 个人财务报表计算，币种分组、金额精确、收支与内部转账/非现金估值分别统计。 */
 @Service

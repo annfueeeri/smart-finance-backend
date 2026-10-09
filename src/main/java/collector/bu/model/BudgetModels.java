@@ -1,4 +1,4 @@
-package collector.bu.model.budget;
+package collector.bu.model;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.*;

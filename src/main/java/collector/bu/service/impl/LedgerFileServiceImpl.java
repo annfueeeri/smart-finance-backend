@@ -4,9 +4,9 @@ import collector.bu.service.LedgerService;
 
 import collector.bu.service.LedgerFileService;
 
-import collector.bu.entity.ledger.LedgerEntry;
+import collector.bu.entity.LedgerEntry;
 import collector.bu.exception.LedgerException;
-import collector.bu.model.ledger.LedgerCategory;
+import collector.bu.model.LedgerCategory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.*;
@@ -19,7 +19,7 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import static collector.bu.model.ledger.LedgerModels.*;
+import static collector.bu.model.LedgerModels.*;
 
 /** 解析 CSV、XLS 和 XLSX，提供无写入预览及安全导出，限制文件大小与行列数量。 */
 @Service

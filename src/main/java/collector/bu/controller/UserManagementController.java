@@ -1,4 +1,4 @@
-package collector.bu.controller.user;
+package collector.bu.controller;
 
 import collector.bu.controller.api.UsersApi;
 import collector.bu.controller.model.Role;

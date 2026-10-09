@@ -4,7 +4,7 @@ import collector.bu.exception.BudgetException;
 import java.util.*;
 import org.springframework.jdbc.core.*;
 import org.springframework.stereotype.Repository;
-import static collector.bu.model.budget.BudgetModels.*;
+import static collector.bu.model.BudgetModels.*;
 
 /** 预算通知模块 SQL：站内提醒持久去重、未读统计和已读更新。 */
 @Repository

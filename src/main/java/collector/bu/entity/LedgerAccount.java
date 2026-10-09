@@ -1,4 +1,4 @@
-package collector.bu.entity.ledger;
+package collector.bu.entity;
 
 import java.time.LocalDateTime;
 

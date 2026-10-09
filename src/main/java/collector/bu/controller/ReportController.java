@@ -1,4 +1,4 @@
-package collector.bu.controller.report;
+package collector.bu.controller;
 
 import collector.bu.service.ReportExportService;
 import collector.bu.service.ReportService;
@@ -8,7 +8,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-import static collector.bu.model.report.ReportModels.*;
+import static collector.bu.model.ReportModels.*;
 
 /** 个人报表完整路径显式列出，查询和导出均复用同一统计条件与算法。 */
 @RestController
