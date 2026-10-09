@@ -8,6 +8,8 @@ import collector.bu.service.impl.LocalAccountInitializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,12 +34,106 @@ class AuthIntegrationTests {
 
     @BeforeEach
     void prepareAccounts() {
+        jdbc.update("DELETE FROM app_user WHERE username LIKE 'registration-%'");
         jdbc.update("DELETE FROM app_user WHERE username IN (?, ?)", "login-test", "disabled-test");
         String hash = encoder.encode(PASSWORD);
         jdbc.update("INSERT INTO app_user (username, password_hash, enabled) VALUES (?, ?, ?)",
                 "login-test", hash, true);
         jdbc.update("INSERT INTO app_user (username, password_hash, enabled) VALUES (?, ?, ?)",
                 "disabled-test", hash, false);
+    }
+
+    @Test
+    void registrationCreatesHashedAccountThatCanLogInWithoutAutomaticallySigningIn() {
+        var browser = new Browser();
+        browser.refreshCsrf();
+        var result = browser.register("registration-new", PASSWORD, PASSWORD);
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(result.getBody().get("username").asText()).isEqualTo("registration-new");
+        assertThat(result.getBody().size()).isEqualTo(1);
+        var account = userDao.findByUsername("registration-new").orElseThrow();
+        assertThat(account.enabled()).isTrue();
+        assertThat(account.passwordHash()).isNotEqualTo(PASSWORD);
+        assertThat(encoder.matches(PASSWORD, account.passwordHash())).isTrue();
+        assertThat(browser.get("/api/auth/me").getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(browser.login("registration-new", PASSWORD).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(browser.get("/api/auth/me").getBody().get("username").asText())
+                .isEqualTo("registration-new");
+    }
+
+    @Test
+    void duplicateRegistrationDoesNotChangeExistingOrDisabledAccounts() {
+        var browser = new Browser();
+        browser.refreshCsrf();
+        for (String username : List.of("login-test", "disabled-test")) {
+            var original = userDao.findByUsername(username).orElseThrow();
+            var result = browser.register(username, "Different-password-456", "Different-password-456");
+            assertThat(result.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+            assertThat(result.getBody().get("code").asText()).isEqualTo("USERNAME_TAKEN");
+            assertThat(userDao.findByUsername(username).orElseThrow()).isEqualTo(original);
+        }
+    }
+
+    @Test
+    void registrationRejectsInvalidPayloadsAndNeverCreatesAnAccount() {
+        var browser = new Browser();
+        browser.refreshCsrf();
+        for (var body : List.of(
+                Map.of("username", "registration-invalid", "password", PASSWORD),
+                Map.of("username", "", "password", PASSWORD, "confirmPassword", PASSWORD),
+                Map.of("username", "invalid user", "password", PASSWORD, "confirmPassword", PASSWORD),
+                Map.of("username", "x".repeat(65), "password", PASSWORD, "confirmPassword", PASSWORD),
+                Map.of("username", "registration-invalid", "password", "short", "confirmPassword", "short"),
+                Map.of("username", "registration-invalid", "password", "        ", "confirmPassword", "        "),
+                Map.of("username", "registration-invalid", "password", PASSWORD, "confirmPassword", "Mismatch-password"),
+                Map.of("username", "registration-invalid", "password", "密".repeat(25), "confirmPassword", "密".repeat(25)),
+                Map.of("username", "registration-invalid", "password", "x".repeat(73), "confirmPassword", "x".repeat(73)))) {
+            var result = browser.post("/api/auth/register", body);
+            assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(result.getBody().get("code").asText()).isEqualTo("INVALID_REQUEST");
+        }
+        assertThat(browser.post("/api/auth/register", "{broken").getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(userDao.findByUsername("registration-invalid")).isEmpty();
+    }
+
+    @Test
+    void registrationRequiresCsrfTokenFromTheSameSession() {
+        assertThat(new Browser().register("registration-csrf", PASSWORD, PASSWORD).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+        var one = new Browser();
+        one.refreshCsrf();
+        var two = new Browser();
+        two.refreshCsrf();
+        two.csrf = one.csrf;
+        assertThat(two.register("registration-csrf", PASSWORD, PASSWORD).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(userDao.findByUsername("registration-csrf")).isEmpty();
+    }
+
+    @Test
+    void registrationAcceptsPasswordsAtTheUtf8ByteLimit() {
+        var browser = new Browser();
+        browser.refreshCsrf();
+        String password = "密".repeat(24);
+        assertThat(browser.register("registration-unicode", password, password).getStatusCode())
+                .isEqualTo(HttpStatus.CREATED);
+        assertThat(browser.login("registration-unicode", password).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void simultaneousRegistrationCreatesExactlyOneAccount() throws Exception {
+        var one = new Browser();
+        one.refreshCsrf();
+        var two = new Browser();
+        two.refreshCsrf();
+        var first = CompletableFuture.supplyAsync(() -> one.register("registration-race", PASSWORD, PASSWORD));
+        var second = CompletableFuture.supplyAsync(() -> two.register("registration-race", PASSWORD, PASSWORD));
+        assertThat(List.of(first.get(15, TimeUnit.SECONDS).getStatusCode(),
+                second.get(15, TimeUnit.SECONDS).getStatusCode()))
+                .containsExactlyInAnyOrder(HttpStatus.CREATED, HttpStatus.CONFLICT);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM app_user WHERE username = ?", Integer.class,
+                "registration-race")).isEqualTo(1);
     }
 
     @Test
@@ -180,6 +276,11 @@ class AuthIntegrationTests {
 
         ResponseEntity<JsonNode> login(String username, String password) {
             return post("/api/auth/login", Map.of("username", username, "password", password));
+        }
+
+        ResponseEntity<JsonNode> register(String username, String password, String confirmPassword) {
+            return post("/api/auth/register", Map.of("username", username,
+                    "password", password, "confirmPassword", confirmPassword));
         }
 
         ResponseEntity<JsonNode> get(String path) {

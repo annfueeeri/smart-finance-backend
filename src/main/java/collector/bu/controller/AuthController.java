@@ -3,6 +3,7 @@ package collector.bu.controller;
 import collector.bu.controller.api.AuthApi;
 import collector.bu.controller.model.CsrfResponse;
 import collector.bu.controller.model.LoginRequest;
+import collector.bu.controller.model.RegisterRequest;
 import collector.bu.controller.model.UserResponse;
 import collector.bu.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,6 +37,12 @@ public class AuthController implements AuthApi {
     public ResponseEntity<CsrfResponse> getCsrf() {
         var csrf = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
         return ResponseEntity.ok(new CsrfResponse(csrf.getToken(), csrf.getHeaderName(), csrf.getParameterName()));
+    }
+
+    @Override
+    public ResponseEntity<UserResponse> register(String csrfToken, RegisterRequest body) {
+        authService.register(body.getUsername(), body.getPassword(), body.getConfirmPassword());
+        return ResponseEntity.status(201).body(new UserResponse(body.getUsername()));
     }
 
     @Override

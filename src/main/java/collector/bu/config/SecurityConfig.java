@@ -58,7 +58,7 @@ public class SecurityConfig {
             CsrfTokenRepository csrf, SessionAuthenticationStrategy sessions) throws Exception {
         return http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/health", "/api/auth/csrf", "/api/auth/login",
+                        .requestMatchers("/api/health", "/api/auth/csrf", "/api/auth/login", "/api/auth/register",
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/error").permitAll()
                         .anyRequest().authenticated())
                 .securityContext(context -> context.securityContextRepository(contexts))

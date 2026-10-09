@@ -1,6 +1,7 @@
 package collector.bu.controller;
 
 import collector.bu.controller.model.ErrorResponse;
+import collector.bu.service.RegistrationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
@@ -11,6 +12,15 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    @ExceptionHandler(RegistrationException.class)
+    public ResponseEntity<ErrorResponse> registrationFailed(RegistrationException exception) {
+        if (exception.reason() == RegistrationException.Reason.USERNAME_TAKEN) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(new ErrorResponse("USERNAME_TAKEN", "用户名已被注册"));
+        }
+        return invalidRequest();
+    }
+
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ErrorResponse> authenticationFailed() {
         // Do not disclose whether an account exists or is disabled.

@@ -1,7 +1,12 @@
 openapi: 3.0.3
 info:
   title: Smart Finance API
-  version: 0.0.1
+  version: 0.0.2
+  description: |
+    Smart Finance uses a JSESSIONID cookie and CSRF protection.
+    First GET /api/auth/csrf and retain its cookie. Send the returned token in
+    X-CSRF-TOKEN for registration, login and logout. Registration creates an
+    account without signing in; log in separately and refresh CSRF after login.
 paths:
   /api/health:
     get:
@@ -28,6 +33,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CsrfResponse'
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      summary: 注册账号
+      description: |
+        创建账号，不自动登录。username 为 1–64 个非空白字符；password 至少
+        8 个字符、最多 72 个 UTF-8 字节，且不能全为空白；confirmPassword
+        必须与 password 完全一致。密码仅以 BCrypt 哈希保存。
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: 账号创建成功，返回用户名；之后需调用登录接口
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: 用户名已被注册（USERNAME_TAKEN），不会覆盖原账号
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/auth/login:
     post:
       tags: [Auth]
@@ -117,6 +156,30 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
+    RegisterRequest:
+      type: object
+      required: [username, password, confirmPassword]
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: '\S+'
+          description: 用户名，不允许包含空白
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 8
+          maxLength: 72
+          description: 至少 8 个字符，最多 72 个 UTF-8 字节，不能全为空白
+        confirmPassword:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 8
+          maxLength: 72
+          description: 必须与 password 完全一致
     LoginRequest:
       type: object
       required: [username, password]

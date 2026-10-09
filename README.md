@@ -42,20 +42,49 @@ Controller 不引用 DAO、JdbcTemplate 或用户实体；SQL 仅出现在 DAO�
 | 接口 | 行为 |
 | --- | --- |
 | `GET /api/auth/csrf` | 获取 token、headerName、parameterName；同时保留 JSESSIONID cookie |
+| `POST /api/auth/register` | JSON `{ username, password, confirmPassword }`；成功返回 201 和用户名，不自动登录 |
 | `POST /api/auth/login` | JSON `{ "username": "你的用户名", "password": "你的密码" }`；成功返回用户名并更换 Session ID |
 | `GET /api/auth/me` | 携带登录后的 cookie 获取当前用户名；未登录返回 401 |
 | `POST /api/auth/logout` | 携带 cookie 与有效 CSRF token，销毁 Session，返回 204 |
 
-登录和退出请求都必须携带 `/api/auth/csrf` 返回的 token（请求头名为 `X-CSRF-TOKEN`）。
+注册、登录和退出请求都必须携带 `/api/auth/csrf` 返回的 token（请求头名为 `X-CSRF-TOKEN`）。
 登录成功会清除旧 CSRF token，因此后续 POST 前要重新获取。
 前端同源请求使用 `credentials: 'same-origin'` 保存 cookie；用户名和密码放在请求体中，不能放在 URL 中。
 未提供或提供其他 Session 的 CSRF token 返回 403；输入不合法返回 400；
 密码错误、账号不存在及禁用账号统一返回 401 和 `INVALID_CREDENTIALS`。
 
-除健康检查、登录、CSRF、API 文档外，应用路由默认要求登录。
+除健康检查、注册、登录、CSRF、API 文档外，应用路由默认要求登录。
 Session 空闲 30 分钟过期；cookie 为 HttpOnly、SameSite=Strict。
 生产部署须使用 HTTPS，并设置 `SESSION_COOKIE_SECURE=true`；多实例部署需要共享 Session 或负载均衡会话粘滞。
-当前实现未包含注册、密码找回、多因素认证或登录限流。
+当前实现未包含密码找回、多因素认证或登录/注册限流。
+
+### 注册账号
+
+前端首页和登录页的登录按钮下方提供“新規登録”入口，注册页为 `#/register`。
+注册字段为用户名、密码、确认密码。用户名为 1–64 个非空白字符；密码至少 8 个字符、
+最多 72 个 UTF-8 字节且不能全为空白，确认密码必须与密码完全一致。
+后端使用 BCrypt 哈希保存密码，不保存确认密码，也不会在响应中返回密码。
+注册成功后需要登录；重复用户名返回 409 和 `USERNAME_TAKEN`，不会覆盖或启用已有账号。
+数据库唯一约束保证并发注册不会创建重复账号。
+
+默认 `local` profile 下，注册账号也保存在内存 H2 中，后端重启后会消失。
+需要持久保存账号时使用上文的 MySQL profile，并先创建用户表。
+
+### JSON 接口文档
+
+可下载的 OpenAPI 3.0.3 文档位于 [`docs/smart-finance-openapi.json`](docs/smart-finance-openapi.json)，
+包含健康检查、CSRF、注册、登录、当前用户和退出接口的请求字段、状态码和认证要求。
+可以导入支持 OpenAPI 的接口工具；文档不包含真实凭据。
+
+`src/main/resources/api.yaml` 是接口和代码生成的定义来源。修改后执行：
+
+```sh
+# Python 3 + PyYAML（当前云环境已提供）
+python3 scripts/export-api-doc.py
+mvn verify
+```
+
+验证会检查 JSON 与 YAML 一致，避免导出的文档过期。
 
 ### 本地测试账号
 
