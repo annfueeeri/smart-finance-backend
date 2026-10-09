@@ -8,11 +8,20 @@ import java.util.Map;
 /** 收支模块对外数据结构，金额统一使用十进制字符串，审计信息由后端生成。 */
 public final class LedgerModels {
     /** 创建账户请求，币种不填时采用用户默认币种。 */
-    public record AccountInput(@NotBlank @Size(max=80) String name, @Pattern(regexp="[A-Z]{3}") String currency) { }
+    public record AccountInput(@NotBlank @Size(max=80) String name, @Pattern(regexp="[A-Z]{3}") String currency,
+            String type,String openingBalance,LocalDate openingDate) {
+        /** 兼容已有 Java 调用，未提供余额时使用零余额和历史起点。 */
+        public AccountInput(String name,String currency) { this(name,currency,null,null,null); }
+    }
     /** 创建收支请求，不接受用户 ID、身份或审计操作者。 */
     public record EntryInput(@NotNull @Min(1) Long accountId, @NotBlank @Pattern(regexp="INCOME|EXPENSE") String kind,
             @NotBlank @Pattern(regexp="[0-9]{1,12}(\\.[0-9]{1,4})?") String amount,
-            @NotNull LocalDate date, @NotBlank String category, @Size(max=120) String merchant, @Size(max=1000) String note) { }
+            @NotNull LocalDate date, @NotBlank String category, @Size(max=120) String merchant, @Size(max=1000) String note,@Size(max=10) List<@NotBlank @Size(max=30) String> tags) {
+        /** 兼容已有无标签的导入、测试和客户端，标签默认空列表。 */
+        public EntryInput(Long accountId,String kind,String amount,LocalDate date,String category,String merchant,String note) {
+            this(accountId,kind,amount,date,category,merchant,note,List.of());
+        }
+    }
     /** 分页结果，total 是当前用户在当前筛选条件下的条数。 */
     public record EntryPage(List<LedgerEntry> items, long total, int page, int size) { }
     /** 分类选项，按类型分组显示。 */

@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Smart Finance API",
-    "version": "0.0.6",
+    "version": "0.0.7",
     "description": "Smart Finance uses a JSESSIONID cookie and CSRF protection.\nFirst GET /api/auth/csrf and retain its cookie. Send the returned token in\nX-CSRF-TOKEN for registration, login and logout. Registration creates an\naccount without signing in; log in separately and refresh CSRF after login.\n"
   },
   "paths": {
@@ -808,7 +808,7 @@
             }
           }
         },
-        "description": "相同账户、方向、金额、日期、分类、商家和备注视为重复；仅在本人未删除流水中比较。每批最多500条；前端明确排除预览错误行后提交有效行。创建/修改用户来自认证会话。"
+        "description": "相同账户、方向、金额、日期、分类、商家、备注和标准化标签视为重复；仅在本人未删除流水中比较。每批最多500条；前端明确排除预览错误行后提交有效行。创建/修改用户来自认证会话。"
       }
     },
     "/api/transactions/export": {
@@ -1650,6 +1650,685 @@
         ],
         "description": "只分析已结束 MONTH 预算。默认最近12个结束月份，日期范围内含端点；分类合计排除 TOTAL 并按币种独立分组。"
       }
+    },
+    "/api/reports/options": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "operationId": "getReportOptions",
+        "summary": "本人真实标签筛选选项",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportOptions"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "ACCOUNT_NOT_FOUND 本人账户不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/financial": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "operationId": "getFinancialReport",
+        "summary": "本人财务报表：收支、趋势、现金流、资产、同比环比、商家和标签",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancialReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "ACCOUNT_NOT_FOUND 本人账户不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "description": "所有金额用十进制字符串；不限制前10000笔流水。商家排行前20名；标签统计可重叠，收支合计不重复。分类趋势独立取截至end的最近六个自然月，终点月截至end。环比/同比将同一日期区间按日历移动月/年，完整月份保持首末日；百分比比较基数为零时返回null。账户现金流和资产/余额仅应用日期/账户/币种，内部转账不计入收入和支出。资产历史采用期初基准加流水和最近日终估值；基准前unknown，不伪造银行余额。",
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "闭区间开始；默认用户时区本月1日；1900至9998年。"
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "闭区间结束；默认用户时区今天。"
+          },
+          {
+            "name": "grouping",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DAY",
+                "WEEK",
+                "MONTH",
+                "YEAR"
+              ],
+              "default": "MONTH"
+            },
+            "description": "按日/周一至周日/月/年分组，补齐零流水；DAY最多366天，其他最多3661天。"
+          },
+          {
+            "name": "accountId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "description": "仅本人账户；管理员也不能读取他人财务。"
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ISO4217有效币种；省略时各币种分别统计。"
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INCOME",
+                "EXPENSE"
+              ]
+            },
+            "description": "只筛选收支分析，现金流/余额仍使用完整所选账户流水。"
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SALARY",
+                "BONUS",
+                "PART_TIME",
+                "INVESTMENT",
+                "INTEREST",
+                "GIFT",
+                "OTHER_INCOME",
+                "FOOD",
+                "SHOPPING",
+                "TRANSPORT",
+                "HOUSING",
+                "ENTERTAINMENT",
+                "MEDICAL",
+                "OTHER_EXPENSE"
+              ]
+            },
+            "description": "只筛选收支分析和六个月分类趋势。"
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30
+            },
+            "description": "只筛选收支分析；标签精确匹配。"
+          }
+        ]
+      }
+    },
+    "/api/reports/export": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "operationId": "exportFinancialReport",
+        "summary": "导出同一筛选条件完整统计与摘要",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "附件 financial-report.csv/xlsx/pdf，Cache-Control: no-store",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "ACCOUNT_NOT_FOUND 本人账户不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "description": "CSV含完整明细和摘要（UTF8 BOM，公式文本转义）；XLSX额外含原生收支/分类/资产图表；PDF额外含矢量图、摘要和分页完整明细，嵌入OFL中文字体。与页面查询使用同一统计算法。",
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "闭区间开始；默认用户时区本月1日；1900至9998年。"
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "闭区间结束；默认用户时区今天。"
+          },
+          {
+            "name": "grouping",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DAY",
+                "WEEK",
+                "MONTH",
+                "YEAR"
+              ],
+              "default": "MONTH"
+            },
+            "description": "按日/周一至周日/月/年分组，补齐零流水；DAY最多366天，其他最多3661天。"
+          },
+          {
+            "name": "accountId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "description": "仅本人账户；管理员也不能读取他人财务。"
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ISO4217有效币种；省略时各币种分别统计。"
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INCOME",
+                "EXPENSE"
+              ]
+            },
+            "description": "只筛选收支分析，现金流/余额仍使用完整所选账户流水。"
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SALARY",
+                "BONUS",
+                "PART_TIME",
+                "INVESTMENT",
+                "INTEREST",
+                "GIFT",
+                "OTHER_INCOME",
+                "FOOD",
+                "SHOPPING",
+                "TRANSPORT",
+                "HOUSING",
+                "ENTERTAINMENT",
+                "MEDICAL",
+                "OTHER_EXPENSE"
+              ]
+            },
+            "description": "只筛选收支分析和六个月分类趋势。"
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30
+            },
+            "description": "只筛选收支分析；标签精确匹配。"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "csv",
+                "xlsx",
+                "pdf"
+              ],
+              "default": "csv"
+            }
+          }
+        ]
+      }
+    },
+    "/api/accounts/{id}": {
+      "put": {
+        "tags": [
+          "Reports"
+        ],
+        "operationId": "updateFinancialAccount",
+        "summary": "修改本人账户名称和资产类型",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerAccount"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "ACCOUNT_NOT_FOUND 本人账户不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "description": "ACCOUNT_DUPLICATE 同名同币种账户已存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountProfile"
+              }
+            }
+          }
+        },
+        "description": "不能修改币种/期初日期/期初金额，修正余额请追加日终估值；同名同币种409。"
+      }
+    },
+    "/api/transfers": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "operationId": "listTransfers",
+        "summary": "查看本人全部内部转账",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Transfer"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "ACCOUNT_NOT_FOUND 本人账户不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "operationId": "createTransfer",
+        "summary": "本人同币种不同账户原子内部转账",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transfer"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "ACCOUNT_NOT_FOUND 本人账户不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferInput"
+              }
+            }
+          }
+        },
+        "description": "禁止跨用户/同账户/跨币种，不影响预算消费。币种从账户获取，日期1900至9998，金额必须正数。"
+      }
+    },
+    "/api/accounts/{id}/valuations": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "operationId": "listAccountValuations",
+        "summary": "查看本人账户全部余额校准历史",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Valuation"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "ACCOUNT_NOT_FOUND 本人账户不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "operationId": "createAccountValuation",
+        "summary": "记录本人账户日终余额或投资市值",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Valuation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "ACCOUNT_NOT_FOUND 本人账户不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValuationInput"
+              }
+            }
+          }
+        },
+        "description": "日期不得早于余额基准日期，年份1900至9998。同日最后id生效，保留旧记录审计；日终值覆盖当日及以前的全部流水，之后继续累计。不生成收支或预算消费，负余额计入负债。"
+      }
     }
   },
   "components": {
@@ -1971,7 +2650,10 @@
           "createdBy",
           "updatedAt",
           "updatedBy",
-          "deleted"
+          "deleted",
+          "type",
+          "openingBalance",
+          "openingDate"
         ],
         "properties": {
           "id": {
@@ -2003,6 +2685,24 @@
           "deleted": {
             "type": "boolean",
             "description": "是否逻辑删除；当前查询只返回 false"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "BANK",
+              "CASH",
+              "EWALLET",
+              "INVESTMENT",
+              "LIABILITY"
+            ]
+          },
+          "openingBalance": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "openingDate": {
+            "type": "string",
+            "format": "date"
           }
         }
       },
@@ -2021,6 +2721,29 @@
             "type": "string",
             "pattern": "^[A-Z]{3}$",
             "description": "省略时采用用户默认币种"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "BANK",
+              "CASH",
+              "EWALLET",
+              "INVESTMENT",
+              "LIABILITY"
+            ],
+            "default": "CASH"
+          },
+          "openingBalance": {
+            "type": "string",
+            "pattern": "^-?[0-9]{1,12}(\\.[0-9]{1,4})?$",
+            "description": "允许负数及零；不超过币种最小单位精度，不舍入。负余额计入负债。",
+            "default": "0"
+          },
+          "openingDate": {
+            "type": "string",
+            "format": "date",
+            "default": "1900-01-01",
+            "description": "余额基准为该日开始时的余额，年份1900至9998。历史接口省略时用1900-01-01/0，不代表银行实际余额。"
           }
         }
       },
@@ -2081,6 +2804,17 @@
           "note": {
             "type": "string",
             "maxLength": 1000
+          },
+          "tags": {
+            "type": "array",
+            "nullable": true,
+            "maxItems": 10,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30
+            },
+            "description": "省略/null表示空标签；去首尾空白、去重、排序。禁止控制字符和 | , ， ;；导入/导出以 | 分隔。"
           }
         }
       },
@@ -2101,7 +2835,8 @@
           "createdBy",
           "updatedAt",
           "updatedBy",
-          "deleted"
+          "deleted",
+          "tags"
         ],
         "properties": {
           "id": {
@@ -2178,6 +2913,17 @@
           "deleted": {
             "type": "boolean",
             "description": "是否逻辑删除；当前查询只返回 false"
+          },
+          "tags": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30
+            },
+            "description": "省略/null表示空标签；去首尾空白、去重、排序。禁止控制字符和 | , ， ;；导入/导出以 | 分隔。",
+            "nullable": false
           }
         }
       },
@@ -2273,7 +3019,7 @@
               "type": "integer",
               "minimum": 0
             },
-            "description": "零起始列索引。允许 amount/date/kind/account/category/merchant/note/currency；amount、date 必须映射。"
+            "description": "零起始列索引。允许 amount/date/kind/account/category/merchant/note/currency/tags；amount、date 必须映射。另允许 tags 列（| 或逗号分隔）。"
           },
           "defaultKind": {
             "type": "string",
@@ -3056,6 +3802,737 @@
             "items": {
               "$ref": "#/components/schemas/BudgetCategoryHistory"
             }
+          }
+        }
+      },
+      "ReportFilter": {
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "grouping",
+          "accountId",
+          "currency",
+          "kind",
+          "category",
+          "tag"
+        ],
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "format": "date"
+          },
+          "grouping": {
+            "type": "string",
+            "enum": [
+              "DAY",
+              "WEEK",
+              "MONTH",
+              "YEAR"
+            ]
+          },
+          "accountId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "tag": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ReportSummary": {
+        "type": "object",
+        "required": [
+          "income",
+          "expense",
+          "net",
+          "averageDailyExpense",
+          "incomeCount",
+          "expenseCount"
+        ],
+        "properties": {
+          "income": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "expense": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "net": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "averageDailyExpense": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "incomeCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expenseCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "description": "闭区间天数计算平均日支出，金额按币种精度HALF_UP，实际次数不是SQL聚合行数。"
+      },
+      "ReportTrend": {
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "income",
+          "expense",
+          "net"
+        ],
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "format": "date"
+          },
+          "income": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "expense": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "net": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          }
+        }
+      },
+      "ReportCategoryShare": {
+        "type": "object",
+        "required": [
+          "category",
+          "amount",
+          "percentage",
+          "count"
+        ],
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "percentage": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ReportCategoryPoint": {
+        "type": "object",
+        "required": [
+          "month",
+          "category",
+          "amount"
+        ],
+        "properties": {
+          "month": {
+            "type": "string",
+            "example": "2026-10"
+          },
+          "category": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          }
+        }
+      },
+      "ReportRanking": {
+        "type": "object",
+        "required": [
+          "name",
+          "amount",
+          "count"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ReportCashFlow": {
+        "type": "object",
+        "required": [
+          "accountId",
+          "name",
+          "type",
+          "openingBalance",
+          "openingKnown",
+          "inflow",
+          "outflow",
+          "internalInflow",
+          "internalOutflow",
+          "balanceAdjustment",
+          "closingBalance",
+          "closingKnown"
+        ],
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "BANK",
+              "CASH",
+              "EWALLET",
+              "INVESTMENT",
+              "LIABILITY"
+            ]
+          },
+          "openingBalance": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "openingKnown": {
+            "type": "boolean"
+          },
+          "inflow": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "outflow": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "internalInflow": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "internalOutflow": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "balanceAdjustment": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "closingBalance": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "closingKnown": {
+            "type": "boolean"
+          }
+        },
+        "description": "期初+外部流入-外部流出+内部流入-内部流出+余额调整=期末。基准前余额未知，以0占位并标记known=false。"
+      },
+      "ReportAssetPoint": {
+        "type": "object",
+        "required": [
+          "date",
+          "assets",
+          "liabilities",
+          "netAssets",
+          "unknownAccounts"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "assets": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "liabilities": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "netAssets": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "unknownAccounts": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ReportAccountPoint": {
+        "type": "object",
+        "required": [
+          "date",
+          "balance",
+          "known"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "balance": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "known": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReportAccountBalance": {
+        "type": "object",
+        "required": [
+          "accountId",
+          "name",
+          "type",
+          "balance",
+          "known",
+          "history"
+        ],
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "BANK",
+              "CASH",
+              "EWALLET",
+              "INVESTMENT",
+              "LIABILITY"
+            ]
+          },
+          "balance": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "known": {
+            "type": "boolean"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportAccountPoint"
+            }
+          }
+        }
+      },
+      "ReportChange": {
+        "type": "object",
+        "required": [
+          "current",
+          "previous",
+          "difference",
+          "percentage"
+        ],
+        "properties": {
+          "current": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "previous": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "difference": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "percentage": {
+            "type": "string",
+            "nullable": true,
+            "description": "difference / abs(previous) * 100，保留两位小数；previous为0时返回null。"
+          }
+        }
+      },
+      "ReportComparison": {
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "income",
+          "expense",
+          "net"
+        ],
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "format": "date"
+          },
+          "income": {
+            "$ref": "#/components/schemas/ReportChange"
+          },
+          "expense": {
+            "$ref": "#/components/schemas/ReportChange"
+          },
+          "net": {
+            "$ref": "#/components/schemas/ReportChange"
+          }
+        }
+      },
+      "ReportCurrency": {
+        "type": "object",
+        "required": [
+          "currency",
+          "summary",
+          "trend",
+          "categories",
+          "categoryTrend",
+          "merchants",
+          "tags",
+          "cashFlow",
+          "assets",
+          "balances",
+          "monthOverMonth",
+          "yearOverYear"
+        ],
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ReportSummary"
+          },
+          "trend": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportTrend"
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportCategoryShare"
+            }
+          },
+          "categoryTrend": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportCategoryPoint"
+            }
+          },
+          "merchants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportRanking"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportRanking"
+            }
+          },
+          "cashFlow": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportCashFlow"
+            }
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportAssetPoint"
+            }
+          },
+          "balances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportAccountBalance"
+            }
+          },
+          "monthOverMonth": {
+            "$ref": "#/components/schemas/ReportComparison"
+          },
+          "yearOverYear": {
+            "$ref": "#/components/schemas/ReportComparison"
+          }
+        }
+      },
+      "FinancialReport": {
+        "type": "object",
+        "required": [
+          "filter",
+          "currencies"
+        ],
+        "properties": {
+          "filter": {
+            "$ref": "#/components/schemas/ReportFilter"
+          },
+          "currencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportCurrency"
+            }
+          }
+        },
+        "description": "同币种独立统计，禁止未经汇率换算跨币种合计。无账户时返回用户默认/筛选币种的零统计。"
+      },
+      "ReportOptions": {
+        "type": "object",
+        "required": [
+          "tags"
+        ],
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "AccountProfile": {
+        "type": "object",
+        "required": [
+          "name",
+          "type"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "BANK",
+              "CASH",
+              "EWALLET",
+              "INVESTMENT",
+              "LIABILITY"
+            ]
+          }
+        }
+      },
+      "TransferInput": {
+        "type": "object",
+        "required": [
+          "fromAccountId",
+          "toAccountId",
+          "amount",
+          "date"
+        ],
+        "properties": {
+          "fromAccountId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "toAccountId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^[0-9]{1,12}(\\.[0-9]{1,4})?$",
+            "description": "正数十进制字符串，不超过账户币种最小单位精度；禁止舍入"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      },
+      "Transfer": {
+        "type": "object",
+        "required": [
+          "id",
+          "fromAccountId",
+          "toAccountId",
+          "currency",
+          "amount",
+          "date",
+          "note",
+          "createdAt",
+          "createdBy",
+          "updatedAt",
+          "updatedBy",
+          "deleted"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "fromAccountId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "toAccountId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "currency": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "数据库创建时间（服务器时间，无时区后缀）"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "数据库最后修改时间（服务器时间，无时区后缀）"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "是否逻辑删除；当前查询只返回 false"
+          }
+        }
+      },
+      "ValuationInput": {
+        "type": "object",
+        "required": [
+          "date",
+          "balance"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "balance": {
+            "type": "string",
+            "pattern": "^-?[0-9]{1,12}(\\.[0-9]{1,4})?$",
+            "description": "允许负数及零；不超过币种最小单位精度，不舍入。负余额计入负债。"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      },
+      "Valuation": {
+        "type": "object",
+        "required": [
+          "id",
+          "accountId",
+          "date",
+          "balance",
+          "note",
+          "createdAt",
+          "createdBy",
+          "updatedAt",
+          "updatedBy",
+          "deleted"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "accountId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "balance": {
+            "type": "string",
+            "description": "十进制金额字符串，按币种最小单位精度输出，允许有符号余额和差额"
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "数据库创建时间（服务器时间，无时区后缀）"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "数据库最后修改时间（服务器时间，无时区后缀）"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "是否逻辑删除；当前查询只返回 false"
           }
         }
       }

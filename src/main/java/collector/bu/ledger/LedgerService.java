@@ -43,7 +43,13 @@ public class LedgerService {
         try {
             if (name.isBlank() || name.length()>80 || Currency.getInstance(currency).getDefaultFractionDigits()<0) throw new IllegalArgumentException();
         } catch (IllegalArgumentException exception) { throw new LedgerException(LedgerException.Reason.INVALID_REQUEST); }
-        try { return ledger.createAccount(user.id(), username, name, currency); }
+        var type=input.type()==null ? "CASH" : input.type();
+        var opening=input.openingBalance()==null ? "0" : input.openingBalance();
+        var date=input.openingDate()==null ? LocalDate.of(1900,1,1) : input.openingDate();
+        if(!java.util.Set.of("BANK","CASH","EWALLET","INVESTMENT","LIABILITY").contains(type) || !opening.matches("-?[0-9]{1,12}(\\.[0-9]{1,4})?")
+                || new BigDecimal(opening).scale()>Currency.getInstance(currency).getDefaultFractionDigits() || date.getYear()<1900 || date.getYear()>9998)throw new LedgerException(LedgerException.Reason.INVALID_REQUEST);
+        ledger.lockUser(user.id());
+        try { return ledger.createAccount(user.id(), username, name, currency,type,new BigDecimal(opening),date); }
         catch (DuplicateKeyException exception) { throw new LedgerException(LedgerException.Reason.ACCOUNT_DUPLICATE); }
     }
     /** 验证账户归属、类型与分类、正数金额、日期和可选文字；不允许金额被数据库舍入。 */
@@ -53,6 +59,7 @@ public class LedgerService {
         var account=ledger.account(user.id(),input.accountId())
                 .orElseThrow(() -> new LedgerException(LedgerException.Reason.ACCOUNT_NOT_FOUND));
         try {
+            if(input.tags()!=null && (input.tags().size()>10 || input.tags().stream().anyMatch(tag -> tag==null || tag.isBlank() || tag.strip().length()>30 || tag.codePoints().anyMatch(ch -> Character.isISOControl(ch) || ch=='|' || ch==',' || ch=='，' || ch==';'))))throw new IllegalArgumentException();
             var category=LedgerCategory.valueOf(input.category());
             if (!category.kind().equals(input.kind()) || input.amount()==null
                     || !input.amount().matches("[0-9]{1,12}(\\.[0-9]{1,4})?") || input.date()==null
@@ -72,7 +79,7 @@ public class LedgerService {
         var account=validate(username,input);
         ledger.lockUser(user.id());
         var entry=ledger.createEntry(user.id(),username,account,input.kind(),new BigDecimal(input.amount()),input.date(),
-                input.category(),clean(input.merchant()),clean(input.note()));
+                input.category(),clean(input.merchant()),clean(input.note()),ledger.normalizeTags(input.tags()));
         if(input.kind().equals("EXPENSE"))budgets.refresh(username);
         return entry;
     }
@@ -95,7 +102,7 @@ public class LedgerService {
         for (var entry : input.entries()) {
             var account=validate(username,entry);
             if (!Boolean.FALSE.equals(input.skipDuplicates()) && ledger.duplicate(user.id(),entry)) { skipped++; continue; }
-            ledger.createEntry(user.id(),username,account,entry.kind(),new BigDecimal(entry.amount()),entry.date(),entry.category(),clean(entry.merchant()),clean(entry.note()));
+            ledger.createEntry(user.id(),username,account,entry.kind(),new BigDecimal(entry.amount()),entry.date(),entry.category(),clean(entry.merchant()),clean(entry.note()),ledger.normalizeTags(entry.tags()));
             imported++; expense=expense || entry.kind().equals("EXPENSE");
         }
         if(expense)budgets.refresh(username);

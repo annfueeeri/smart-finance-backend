@@ -18,7 +18,7 @@ import static collector.bu.ledger.LedgerModels.*;
 public class LedgerFiles {
     private final LedgerService service;
     private final ObjectMapper mapper;
-    private static final Set<String> FIELDS=Set.of("amount","date","kind","account","category","merchant","note","currency");
+    private static final Set<String> FIELDS=Set.of("amount","date","kind","account","category","merchant","note","currency","tags");
     private record Table(List<String> headers,List<List<String>> rows,List<Integer> numbers) { }
     /** 注入账本验证服务和 JSON 映射组件。 */
     public LedgerFiles(LedgerService service,ObjectMapper mapper) { this.service=service; this.mapper=mapper; }
@@ -137,9 +137,9 @@ public class LedgerFiles {
                 stage="日期"; var date=date(value(row,mapping,"date"));
                 stage="分类"; var category=value(row,mapping,"category");
                 category=category(category.isBlank() ? Optional.ofNullable(mapping.defaultCategory()).orElse("") : category,kind);
-                entry=new EntryInput(account.id(),kind,amount,date,category,value(row,mapping,"merchant"),value(row,mapping,"note"));
+                entry=new EntryInput(account.id(),kind,amount,date,category,value(row,mapping,"merchant"),value(row,mapping,"note"),value(row,mapping,"tags").isBlank() ? List.of() : Arrays.stream(value(row,mapping,"tags").split("[|,，]")).map(String::strip).toList());
                 stage="金额精度、分类方向或文字长度"; service.validate(username,entry);
-                var key=List.<Object>of(entry.accountId(),kind,new java.math.BigDecimal(amount).stripTrailingZeros(),date,category,entry.merchant(),entry.note());
+                var key=List.<Object>of(entry.accountId(),kind,new java.math.BigDecimal(amount).stripTrailingZeros(),date,category,entry.merchant(),entry.note(),entry.tags().stream().sorted().distinct().toList());
                 duplicate=!seen.add(key) || service.duplicate(username,entry);
                 valid++; if (duplicate) duplicates++;
             } catch (LedgerException | IllegalArgumentException exception) { errors.add(stage+"不合法，请检查格式和字段映射"); invalid++; }
@@ -155,7 +155,7 @@ public class LedgerFiles {
     public byte[] export(String username,String format,String kind,LocalDate start,LocalDate end,Long accountId) {
         if (!format.equals("csv") && !format.equals("xlsx")) throw invalid();
         var entries=service.exportEntries(username,kind,start,end,accountId);
-        var headers=List.of("kind","amount","date","account","category","merchant","note","currency");
+        var headers=List.of("kind","amount","date","account","category","merchant","note","currency","tags");
         try {
             var output=new ByteArrayOutputStream();
             if (format.equals("csv")) {
@@ -180,6 +180,6 @@ public class LedgerFiles {
     /** 按固定导出列顺序提供原始业务值，金额保持十进制字符串且避免无意义的末尾零。 */
     private List<String> cells(LedgerEntry entry) {
         return List.of(entry.kind(),entry.amount().stripTrailingZeros().toPlainString(),entry.date().toString(),entry.accountName(),
-                entry.category(),entry.merchant(),entry.note(),entry.currency());
+                entry.category(),entry.merchant(),entry.note(),entry.currency(),String.join("|",entry.tags()));
     }
 }

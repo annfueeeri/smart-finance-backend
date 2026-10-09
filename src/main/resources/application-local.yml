@@ -2,7 +2,7 @@ spring:
   sql:
     init:
       mode: always
-      schema-locations: classpath:db/schema-users.sql,classpath:db/schema-ledger.sql,classpath:db/schema-budgets.sql
+      schema-locations: classpath:db/schema-users.sql,classpath:db/schema-ledger.sql,classpath:db/schema-budgets.sql,classpath:db/schema-reports.sql
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
     url: jdbc:h2:mem:smartfinance;MODE=MySQL;DB_CLOSE_DELAY=-1

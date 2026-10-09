@@ -283,12 +283,12 @@ CSV 支持 UTF-8（可带 BOM）；Excel 支持 XLS 和 XLSX，读取第一张�
 收支和分类接受机器代码、中日文名称；缺少分类默认“其他收入/支出”。
 
 预览返回各原始记录号、规范化字段、errors 和 duplicate。valid 包含无错误的重复行。
-相同账户、方向、金额、日期、分类、商家、备注视为重复，只比较本人未删除流水。
+相同账户、方向、金额、日期、分类、商家、备注、标准化标签视为重复，只比较本人未删除流水。
 前端在确认时明确排除错误行；后端重新校验整个提交批次，任一提交行无效则整批回滚。
 `skipDuplicates` 省略、null 或 true 默认跳过重复；明确 false 允许重复，重复金额不会自动合并。
 同一用户的并发导入通过数据库用户行锁串行执行。预览不保证确认时数据状态不变，因此确认会再次查重。
 导出 CSV 包含 UTF-8 BOM，并转义以 `= + - @` 或控制字符开头的文本防止公式执行；重新导入会还原该转义。
-XLSX 将全部业务数据保存为字符串单元格。导出列 kind,amount,date,account,category,merchant,note,currency 可直接重新映射导入。
+XLSX 将全部业务数据保存为字符串单元格。导出列 kind,amount,date,account,category,merchant,note,currency,tags 可直接重新映射导入。
 
 已有 MySQL 完成 V2/V3/V4 后，在启动新版应用前执行一次
 `src/main/resources/db/migration/V5__create_ledger_mysql.sql`。
@@ -348,3 +348,49 @@ BUDGET_SMTP_HOST/PORT/USERNAME/PASSWORD、BUDGET_EMAIL_FROM、BUDGET_PUSH_PROVID
 新安装依次执行schema-users.sql、schema-ledger.sql、schema-budgets.sql，框架表保留原结构。
 local H2自动初始化；生产MySQL不自动执行迁移。当前云验证使用H2的MySQL模式，未连接生产MySQL。
 接口JSON文档 `docs/smart-finance-openapi.json` 与api.yaml一致，可用于本地对接和字段核对。
+
+### 财务报表与账户基础数据
+
+侧边栏“財務レポート”使用本人真实流水，提供总收入、总支出、净结余、平均日支出，
+日/周/月/年零流水补齐趋势、分类占比、最近六个月分类变化、账户现金流、资产/负债/净资产曲线、
+账户余额历史、同比环比、商家前20名和标签项目支出。自定义筛选支持日期、账户、币种、收支方向、分类和标签。
+各币种独立统计，不进行无汇率换算的加总。所有财务计算使用BigDecimal，接口金额及百分比为字符串。
+汇总没有流水下载的10000条限制；默认统计用户当地本月1日至今天；DAY最多366天，其他分组最多3661天。
+平均日支出按闭区间实际天数计算并按币种精度四舍五入。
+
+| 方法 | 完整路径 | 用途 |
+| --- | --- | --- |
+| GET | `/api/reports/options` | 本人已使用的标签 |
+| GET | `/api/reports/financial` | 全部统计，参数start/end/grouping/accountId/currency/kind/category/tag |
+| GET | `/api/reports/export` | 同一筛选，format=csv/xlsx/pdf；附件含完整明细、摘要及条件 |
+| PUT | `/api/accounts/{id}` | 修改本人账户名称及类型 |
+| GET / POST | `/api/transfers` | 本人内部转账历史 / 创建同币种不同账户的转账 |
+| GET / POST | `/api/accounts/{id}/valuations` | 本人账户日终校准历史 / 追加日终余额或投资市值 |
+
+账户类型BANK/CASH/EWALLET/INVESTMENT/LIABILITY分别表示银行、现金、电子钱包、投资、负债。
+`POST /api/accounts`支持type/openingBalance/openingDate：期初值为基准日开始时余额，
+该日及以后流水加减；之前流水仍用于收支分析，但不再次加到余额，基准前余额标记known=false。
+旧客户端/迁移旧账户默认CASH、0、1900-01-01，仅表示从现有记录累加的余额，不是银行核对余额。
+负数余额计入总负债，正数计入资产；借贷元本可通过负债账户与现金账户振替，利息另记支出。
+日终估值包含当日及以前的全部活动，之后仅累加次日及以后活动；同日最后id生效，原记录保留。
+估值变化计入现金流的balanceAdjustment，不当作所得/消费。账户余额是记账结果，不是外部银行实时查询。
+内部转账保存独立记录，不计入收入、支出或预算消费；仅支持本人同币种不同账户。
+现金流满足期初+外部流入−外部流出+内部流入−内部流出+余额调整=期末。
+账户现金流、资产和余额只应用日期/账户/币种，分类/方向/标签过滤仅作用于收支分析，避免余额失真。
+
+交易新增tags数组，每笔最多10个、每个1–30字符；去首尾空白、去重、排序；禁止控制字符和`| , ， ;`。
+省略/null为无标签；CSV/XLSX新增tags列，以`|`分隔，原八列文件仍兼容。重复检测包含标准化标签。
+多标签交易在各项目分别计入一次，标签合计可能超过总支出，但总收入/支出不重复。
+分类六个月趋势以报表end月份为终点，终点月份只算到end，不受报表start截断。
+环比/同比将所选区间按日历回移一个月/一年，整月保持比较月首末日并处理闰年。
+变化率=(当前−比较期)/abs(比较期)；比较期为零时返回null而不是无穷大。
+
+CSV含UTF8 BOM和公式文本转义；Excel包含精确字符串明细及原生收支折线、分类饼图、资产折线图。
+PDF嵌入OFL中文字体，包含矢量趋势/分类图、摘要和分页完整统计。图形坐标使用浮点，财务金额不经浮点计算。
+PDF极少数不支持的字形显示问号，原文字在JSON/CSV/XLSX保留；字体来源及许可见`src/main/resources/fonts/README.md`。
+
+已有MySQL在V2–V6完成后执行一次`src/main/resources/db/migration/V7__add_financial_reports_mysql.sql`，再启动新版。
+新安装依次执行schema-users.sql、schema-ledger.sql、schema-budgets.sql、schema-reports.sql，勿再执行旧库增量V7。
+新增ledger_transfer、account_valuation均有主键、创建/修改时间及用户、is_deleted及所有者复合外键。
+local H2自动初始化所有业务表；生产MySQL需手动迁移，当前验证使用H2 MySQL模式。
+可直接在本地查看`docs/smart-finance-openapi.json`，它由规范api.yaml生成并与前端路径、参数一致。
