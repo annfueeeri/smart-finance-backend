@@ -9,6 +9,9 @@ import org.junit.jupiter.api.Test;
 import org.yaml.snakeyaml.Yaml;
 
 class OpenApiDocumentTests {
+    /**
+     * 验证可下载 JSON 文档与生成接口代码的 YAML 定义完全一致，防止文档与代码脱节。
+     */
     @Test
     void downloadableJsonMatchesTheApiUsedForCodeGeneration() throws Exception {
         var mapper = new ObjectMapper();

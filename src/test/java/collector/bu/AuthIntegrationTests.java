@@ -32,6 +32,9 @@ class AuthIntegrationTests {
     @Autowired PasswordEncoder encoder;
     @Autowired UserDao userDao;
 
+    /**
+     * 在每个用例前清理测试账号，并准备启用账号与禁用账号及其 BCrypt 密码哈希。
+     */
     @BeforeEach
     void prepareAccounts() {
         jdbc.update("DELETE FROM app_user WHERE username LIKE 'registration-%'");
@@ -43,6 +46,9 @@ class AuthIntegrationTests {
                 "disabled-test", hash, false);
     }
 
+    /**
+     * 验证注册只保存密码哈希、不自动登录，且新账号可随后通过密码登录。
+     */
     @Test
     void registrationCreatesHashedAccountThatCanLogInWithoutAutomaticallySigningIn() {
         var browser = new Browser();
@@ -62,6 +68,9 @@ class AuthIntegrationTests {
                 .isEqualTo("registration-new");
     }
 
+    /**
+     * 验证重复注册被拒绝，原账号和禁用账号的数据不会被覆盖。
+     */
     @Test
     void duplicateRegistrationDoesNotChangeExistingOrDisabledAccounts() {
         var browser = new Browser();
@@ -75,6 +84,9 @@ class AuthIntegrationTests {
         }
     }
 
+    /**
+     * 验证非法注册字段返回 400，并且不会留下新账号。
+     */
     @Test
     void registrationRejectsInvalidPayloadsAndNeverCreatesAnAccount() {
         var browser = new Browser();
@@ -98,6 +110,9 @@ class AuthIntegrationTests {
         assertThat(userDao.findByUsername("registration-invalid")).isEmpty();
     }
 
+    /**
+     * 验证注册必须携带与当前会话匹配的 CSRF 令牌。
+     */
     @Test
     void registrationRequiresCsrfTokenFromTheSameSession() {
         assertThat(new Browser().register("registration-csrf", PASSWORD, PASSWORD).getStatusCode())
@@ -112,6 +127,9 @@ class AuthIntegrationTests {
         assertThat(userDao.findByUsername("registration-csrf")).isEmpty();
     }
 
+    /**
+     * 验证达到 72 个 UTF-8 字节边界的有效密码仍可注册和登录。
+     */
     @Test
     void registrationAcceptsPasswordsAtTheUtf8ByteLimit() {
         var browser = new Browser();
@@ -122,6 +140,9 @@ class AuthIntegrationTests {
         assertThat(browser.login("registration-unicode", password).getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
+    /**
+     * 验证同名并发注册只有一个成功，数据库不会产生重复账号。
+     */
     @Test
     void simultaneousRegistrationCreatesExactlyOneAccount() throws Exception {
         var one = new Browser();
@@ -137,6 +158,9 @@ class AuthIntegrationTests {
                 "registration-race")).isEqualTo(1);
     }
 
+    /**
+     * 验证登录轮换会话 ID，登录状态只对保留对应 Cookie 的浏览器有效。
+     */
     @Test
     void loginRotatesSessionAndAuthenticatesOnlyThatBrowser() {
         var browser = new Browser();
@@ -158,6 +182,9 @@ class AuthIntegrationTests {
         assertThat(oldSession.get("/api/auth/me").getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
+    /**
+     * 验证错误密码、不存在的账号和禁用账号返回相同认证错误。
+     */
     @Test
     void badPasswordUnknownAccountAndDisabledAccountHaveTheSameResponse() {
         var wrong = new Browser();
@@ -177,6 +204,9 @@ class AuthIntegrationTests {
         assertThat(wrong.get("/api/auth/me").getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
+    /**
+     * 验证登录请求必须通过同会话 CSRF 校验。
+     */
     @Test
     void loginRequiresCsrfTokenFromTheSameSession() {
         assertThat(new Browser().login("login-test", PASSWORD).getStatusCode())
@@ -189,6 +219,9 @@ class AuthIntegrationTests {
         assertThat(two.login("login-test", PASSWORD).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
+    /**
+     * 验证缺失或不合法的登录字段返回 400。
+     */
     @Test
     void invalidCredentialsPayloadReturnsBadRequest() {
         var browser = new Browser();
@@ -206,6 +239,9 @@ class AuthIntegrationTests {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    /**
+     * 验证超出字节限制的密码及 SQL 注入形式的用户名都不能通过认证。
+     */
     @Test
     void oversizedUtf8PasswordAndSqlInjectionCannotAuthenticate() {
         var browser = new Browser();
@@ -216,6 +252,9 @@ class AuthIntegrationTests {
                 .isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
+    /**
+     * 验证本地初始化只保存哈希，重复初始化不覆盖已有账号凭据。
+     */
     @Test
     void localBootstrapStoresOnlyHashAndNeverOverwritesExistingAccounts() {
         String username = "bootstrap-test";
@@ -233,6 +272,9 @@ class AuthIntegrationTests {
         }
     }
 
+    /**
+     * 验证本地初始化拒绝不完整或超出长度限制的凭据。
+     */
     @Test
     void localBootstrapRejectsIncompleteAndOversizedCredentials() {
         for (var initializer : List.of(
@@ -244,6 +286,9 @@ class AuthIntegrationTests {
         }
     }
 
+    /**
+     * 验证退出要求登录后的有效 CSRF 令牌，退出后受保护接口不能再用原会话访问。
+     */
     @Test
     void logoutRequiresFreshCsrfAndInvalidatesTheSession() {
         var browser = new Browser();
@@ -256,6 +301,9 @@ class AuthIntegrationTests {
         assertThat(browser.get("/api/auth/me").getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
+    /**
+     * 验证匿名请求只能访问健康检查、接口文档等公开路径。
+     */
     @Test
     void onlyPublicRoutesAreAvailableWithoutAuthentication() {
         var browser = new Browser();
@@ -269,6 +317,9 @@ class AuthIntegrationTests {
         private String csrf;
         private String csrfHeader = "X-CSRF-TOKEN";
 
+        /**
+         * 获取当前测试浏览器会话的 CSRF 令牌及请求头名称，供后续写请求使用。
+         */
         void refreshCsrf() {
             var result = get("/api/auth/csrf");
             assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -276,23 +327,39 @@ class AuthIntegrationTests {
             csrfHeader = result.getBody().get("headerName").asText();
         }
 
+        /**
+         * 用指定用户名和密码向登录接口发送 JSON 请求，返回原始响应供用例断言。
+         */
         ResponseEntity<JsonNode> login(String username, String password) {
             return post("/api/auth/login", Map.of("username", username, "password", password));
         }
 
+        /**
+         * 将用户名、密码和确认密码发送到注册接口，返回原始响应供用例断言。
+         */
         ResponseEntity<JsonNode> register(String username, String password, String confirmPassword) {
             return post("/api/auth/register", Map.of("username", username,
                     "password", password, "confirmPassword", confirmPassword));
         }
 
+        /**
+         * 对给定路径发起无请求体的 GET 请求，沿用当前测试浏览器会话。
+         */
         ResponseEntity<JsonNode> get(String path) {
             return exchange(path, HttpMethod.GET, null);
         }
 
+        /**
+         * 对给定路径提交 POST 请求体，沿用当前会话和可用的 CSRF 令牌。
+         */
         ResponseEntity<JsonNode> post(String path, Object body) {
             return exchange(path, HttpMethod.POST, body);
         }
 
+        /**
+         * 模拟独立浏览器发送 HTTP 请求，携带自己的 Cookie 和写请求 CSRF 令牌。
+         * 从响应更新 JSESSIONID，便于验证登录、退出和会话隔离。
+         */
         private ResponseEntity<JsonNode> exchange(String path, HttpMethod method, Object body) {
             var headers = new HttpHeaders();
             headers.set(HttpHeaders.CONTENT_TYPE, "application/json");
