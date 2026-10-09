@@ -34,6 +34,32 @@ MinIO 客户端依赖已包含；初始项目没有对象存储业务，因此�
 
 ## 用户身份与权限
 
+### 业务表公共字段
+
+所有业务表统一包含以下字段；当前业务表为 `app_user`，Spring Batch 框架表保留官方结构。
+
+| 字段 | 含义 | 规则 |
+| --- | --- | --- |
+| `id` | 主键 | 自增 BIGINT，保留现有主键 |
+| `created_at` | 创建时间 | 数据库生成，微秒精度，不因后续修改而改变 |
+| `created_by` | 创建用户 | 注册时为注册用户名，本地初始化为 `SYSTEM` |
+| `updated_at` | 修改时间 | 创建时初始化，修改身份时由数据库刷新 |
+| `updated_by` | 修改用户 | 创建时与创建用户一致，修改身份时记录已认证的实际管理员 |
+| `is_deleted` | 是否删除 | 默认 `false`，`true` 表示逻辑删除 |
+
+审计用户由后端确定，客户端不能通过请求字段伪造。时间使用数据库服务器的时区。
+逻辑删除的账号不能登录，已有 Session 在下一次请求失效，也不出现在用户列表中；
+身份修改按用户不存在处理，已删除管理员不计入最后管理员保护的数量。
+已删除账号仍占用原用户名，避免新账号继承原账号身份。此变更补充字段及读取规则，
+当前没有新增删除用户接口。管理员列表接口的现有响应字段保持兼容。
+
+新数据库执行 `src/main/resources/db/schema-users.sql`。
+已有 MySQL 数据库先确认身份字段迁移 V2 已完成，再在启动新版应用前执行一次
+`src/main/resources/db/migration/V3__add_user_audit_mysql.sql`；脚本不自动执行。
+旧记录的真实创建/修改时间和用户无法从现有数据恢复，因此以迁移时间填充时间字段，
+并将创建/修改用户标记为 `LEGACY`，原有主键、账号、密码、身份均保留，默认未删除。
+后续新增业务表和写入代码也应遵守以上公共字段及审计规则。
+
 身份保存在 `app_user.role` 中，取值为 `ADMIN`（管理员）或 `USER`（一般用户）。
 新注册用户一律为 `USER`，注册请求中传入身份也不能自行获得管理员权限。
 注册、登录和当前用户响应为 `{ username, role }`。
@@ -65,7 +91,9 @@ MySQL 新安装使用 `src/main/resources/db/schema-users.sql` 创建用户表�
 由可信数据库管理员为指定的已有账号初始化管理员身份，例如将下面的占位用户名替换后执行：
 
 ```sql
-UPDATE app_user SET role = 'ADMIN' WHERE username = '指定的管理员用户名' AND enabled = TRUE;
+UPDATE app_user
+SET role = 'ADMIN', updated_at = CURRENT_TIMESTAMP(6), updated_by = 'SYSTEM'
+WHERE username = '指定的管理员用户名' AND enabled = TRUE AND is_deleted = FALSE;
 ```
 
 初始化完成后，其余身份修改通过管理员页面进行。当前云环境验证使用 H2，未连接你的 MySQL。

@@ -113,7 +113,7 @@
         ],
         "operationId": "login",
         "summary": "校验数据库账号并建立登录会话",
-        "description": "使用用户名查询数据库，通过 BCrypt 校验密码并检查账号启用状态。\n请求必须携带同一会话的 Cookie 和 CSRF 请求头。成功后轮换 JSESSIONID，\n返回用户名和身份，并保存服务端登录状态；浏览器需保留新 Cookie 并刷新 CSRF 令牌。\n",
+        "description": "使用用户名查询数据库，通过 BCrypt 校验密码并检查账号启用及逻辑删除状态。\n请求必须携带同一会话的 Cookie 和 CSRF 请求头。成功后轮换 JSESSIONID，\n返回用户名和身份，并保存服务端登录状态；浏览器需保留新 Cookie 并刷新 CSRF 令牌。\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/CsrfHeader"
@@ -159,7 +159,7 @@
         ],
         "operationId": "getCurrentUser",
         "summary": "查询当前登录用户",
-        "description": "返回当前会话的用户名和数据库最新身份，不返回密码哈希；未登录或会话失效时返回 401。",
+        "description": "返回当前会话的用户名和数据库最新身份，不返回密码哈希；未登录、会话失效、账号禁用或逻辑删除时返回 401。",
         "security": [
           {
             "sessionAuth": []
@@ -220,7 +220,7 @@
         ],
         "operationId": "listUsers",
         "summary": "管理员查询用户列表",
-        "description": "仅 ADMIN 可访问；返回身份和启用状态，不返回密码或密码哈希。",
+        "description": "仅 ADMIN 可访问；仅返回未删除账号的身份和启用状态，不返回密码或密码哈希。",
         "security": [
           {
             "sessionAuth": []
@@ -256,7 +256,7 @@
         ],
         "operationId": "updateUserRole",
         "summary": "管理员修改用户身份",
-        "description": "仅 ADMIN 可操作，要求 Session Cookie 和 CSRF 请求头。\n身份写入数据库，目标用户下一次请求即使用新权限。\n不允许将最后一个启用的管理员降级为一般用户。\n",
+        "description": "仅 ADMIN 可操作，要求 Session Cookie 和 CSRF 请求头。\n身份写入数据库，目标用户下一次请求即使用新权限。\n不允许将最后一个启用的管理员降级为一般用户。\n已删除用户按用户不存在处理；修改时间和实际操作者由后端写入，不接受客户端审计字段。\n",
         "security": [
           {
             "sessionAuth": []

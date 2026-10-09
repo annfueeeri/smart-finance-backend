@@ -21,19 +21,20 @@ public class UserManagementServiceImpl implements UserManagementService {
     public UserManagementServiceImpl(UserDao users) { this.users = users; }
 
     /**
-     * 根据数据库实时状态检查操作者是否存在、已启用且身份为 ADMIN。
+     * 根据数据库实时状态检查操作者是否存在、未删除、已启用且身份为 ADMIN。
      * @param actor 要核实权限的操作者用户名
      * @throws org.springframework.security.access.AccessDeniedException 不具备管理员权限
      */
     private void requireAdmin(String actor) {
         var account = users.findByUsername(actor);
-        if (account.isEmpty() || !account.get().enabled() || account.get().role() != UserRole.ADMIN) {
+        if (account.isEmpty() || !account.get().enabled() || account.get().deleted()
+                || account.get().role() != UserRole.ADMIN) {
             throw new AccessDeniedException("Administrator required");
         }
     }
 
     /**
-     * 核实操作者在数据库中仍为启用的管理员，再读取全部账号。
+     * 核实操作者在数据库中仍为未删除且启用的管理员，再读取全部未删除账号。
      * 返回内部账号数据，Controller 必须移除密码哈希后再对外响应。
      * @param actor 当前登录的操作者用户名
      * @return 包含身份和启用状态的内部账号列表
@@ -49,6 +50,7 @@ public class UserManagementServiceImpl implements UserManagementService {
     /**
      * 由管理员修改指定账号身份，并阻止降级最后一个启用的管理员。
      * 在事务内锁定启用的管理员记录，再复查操作者权限，防止并发降级破坏约束。
+     * 成功修改时保存实际操作者和修改时间，并重新读取完整账号及审计信息。
      * @param actor 当前登录的操作者用户名
      * @param id 目标账号的数据库 ID
      * @param role 要写入的新身份
@@ -67,7 +69,8 @@ public class UserManagementServiceImpl implements UserManagementService {
         if (target.role() == UserRole.ADMIN && target.enabled() && role == UserRole.USER && admins.size() <= 1) {
             throw new UserManagementException(UserManagementException.Reason.LAST_ADMIN);
         }
-        users.updateRole(id, role);
-        return new UserAccount(target.id(), target.username(), target.passwordHash(), target.enabled(), role);
+        users.updateRole(id, role, actor);
+        return users.findById(id).orElseThrow(() ->
+                new UserManagementException(UserManagementException.Reason.USER_NOT_FOUND));
     }
 }

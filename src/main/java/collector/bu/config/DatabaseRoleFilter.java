@@ -30,7 +30,7 @@ public class DatabaseRoleFilter extends OncePerRequestFilter {
 
     /**
      * 在权限检查之前，从数据库重新读取已登录账号的身份和启用状态。
-     * 账号被删除或禁用时销毁会话；否则创建新的安全上下文保存最新身份，
+     * 账号不存在、被逻辑删除或禁用时销毁会话；否则创建新的安全上下文保存最新身份，
      * 避免旧会话保留已撤销权限，也避免修改并发请求共享的上下文对象。
      * @param request 当前 HTTP 请求
      * @param response 当前 HTTP 响应
@@ -45,7 +45,7 @@ public class DatabaseRoleFilter extends OncePerRequestFilter {
         if (authentication != null && authentication.isAuthenticated()
                 && !(authentication instanceof AnonymousAuthenticationToken)) {
             var account = users.findByUsername(authentication.getName());
-            if (account.isEmpty() || !account.get().enabled()) {
+            if (account.isEmpty() || !account.get().enabled() || account.get().deleted()) {
                 SecurityContextHolder.clearContext();
                 var session = request.getSession(false);
                 if (session != null) session.invalidate();

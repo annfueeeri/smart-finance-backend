@@ -73,7 +73,7 @@ public class LocalAccountInitializer implements ApplicationRunner {
                     + " and password (at least 8 characters, at most 72 UTF-8 bytes)");
         }
         if (userDao.findByUsername(username).isEmpty()) {
-            userDao.insert(username, passwordEncoder.encode(password), role);
+            userDao.insert(username, passwordEncoder.encode(password), role, "SYSTEM");
         }
     }
 }

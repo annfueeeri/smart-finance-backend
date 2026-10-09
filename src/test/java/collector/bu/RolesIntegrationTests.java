@@ -65,6 +65,83 @@ class RolesIntegrationTests {
         assertThat(users.findByUsername("role-test-user").orElseThrow().role()).isEqualTo(UserRole.ADMIN);
     }
 
+    /** 验证注册审计信息由后端生成，客户端不能伪造创建用户、时间或删除状态。 */
+    @Test
+    void registrationRecordsTrustedAuditFields() {
+        var browser = new Browser();
+        browser.csrf();
+        var result = browser.exchange("/api/auth/register", HttpMethod.POST, Map.of(
+                "username", "role-test-audit", "password", PASSWORD, "confirmPassword", PASSWORD,
+                "createdBy", "forged-admin", "updatedBy", "forged-admin",
+                "createdAt", "2000-01-01T00:00:00", "isDeleted", true));
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        var account = users.findByUsername("role-test-audit").orElseThrow();
+        assertThat(account.id()).isPositive();
+        assertThat(account.createdAt()).isNotNull();
+        assertThat(account.updatedAt()).isEqualTo(account.createdAt());
+        assertThat(account.createdBy()).isEqualTo("role-test-audit");
+        assertThat(account.updatedBy()).isEqualTo("role-test-audit");
+        assertThat(account.deleted()).isFalse();
+    }
+
+    /** 验证身份修改保留创建信息，记录真实管理员和新的修改时间，拒绝的修改不写审计字段。 */
+    @Test
+    void roleUpdatesRecordActorAndPreserveCreationAudit() {
+        var before = users.findByUsername("role-test-user").orElseThrow();
+        jdbc.update("UPDATE app_user SET updated_at = '2000-01-01 00:00:00', updated_by = 'fixture' WHERE id = ?",
+                before.id());
+        var admin = signedIn("role-test-admin");
+        var result = admin.exchange("/api/admin/users/" + before.id() + "/role", HttpMethod.PUT,
+                Map.of("role", "ADMIN", "updatedBy", "forged-user"));
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var after = users.findById(before.id()).orElseThrow();
+        assertThat(after.createdAt()).isEqualTo(before.createdAt());
+        assertThat(after.createdBy()).isEqualTo(before.createdBy());
+        assertThat(after.updatedAt()).isAfterOrEqualTo(before.createdAt());
+        assertThat(after.updatedBy()).isEqualTo("role-test-admin");
+        assertThat(after.role()).isEqualTo(UserRole.ADMIN);
+
+        var regular = new Browser();
+        regular.csrf();
+        assertThat(regular.put(before.id(), "USER").getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(users.findById(before.id()).orElseThrow()).isEqualTo(after);
+    }
+
+    /** 验证逻辑删除使旧会话失效、禁止重新登录，并排除列表和身份修改目标。 */
+    @Test
+    void deletedAccountsCannotAuthenticateOrBeManaged() {
+        var userId = id("role-test-user");
+        var user = signedIn("role-test-user");
+        jdbc.update("UPDATE app_user SET is_deleted = TRUE, updated_by = ? WHERE id = ?",
+                "role-test-admin", userId);
+        assertThat(user.get("/api/auth/me").getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        var fresh = new Browser();
+        fresh.csrf();
+        assertThat(fresh.exchange("/api/auth/login", HttpMethod.POST,
+                Map.of("username", "role-test-user", "password", PASSWORD)).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(users.findById(userId)).isEmpty();
+        var admin = signedIn("role-test-admin");
+        assertThat(admin.get("/api/admin/users").getBody().findValuesAsText("username"))
+                .doesNotContain("role-test-user");
+        assertThat(admin.put(userId, "ADMIN").getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(users.findByUsername("role-test-user").orElseThrow().deleted()).isTrue();
+        assertThat(fresh.exchange("/api/auth/register", HttpMethod.POST, Map.of(
+                "username", "role-test-user", "password", PASSWORD, "confirmPassword", PASSWORD)).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    /** 验证已删除管理员不计入可用管理员数量，不能借此降级最后一个有效管理员。 */
+    @Test
+    void deletedAdministratorsDoNotBypassLastAdminProtection() {
+        users.insert("role-test-deleted-admin", encoder.encode(PASSWORD), UserRole.ADMIN);
+        jdbc.update("UPDATE app_user SET is_deleted = TRUE WHERE username = ?", "role-test-deleted-admin");
+        var before = users.findByUsername("role-test-admin").orElseThrow();
+        var admin = signedIn("role-test-admin");
+        assertThat(admin.put(before.id(), "USER").getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(users.findById(before.id()).orElseThrow()).isEqualTo(before);
+    }
+
     /**
      * 验证未登录用户和一般用户均不能查询用户列表或修改身份。
      */
@@ -174,6 +251,9 @@ class RolesIntegrationTests {
     void localAdministratorBootstrapIsExplicitAndNeverOverwritesAnExistingRole() {
         new LocalAccountInitializer(users, encoder, "role-test-bootstrap", PASSWORD, UserRole.ADMIN).run(null);
         assertThat(users.findByUsername("role-test-bootstrap").orElseThrow().role()).isEqualTo(UserRole.ADMIN);
+        var bootstrap = users.findByUsername("role-test-bootstrap").orElseThrow();
+        assertThat(bootstrap.createdBy()).isEqualTo("SYSTEM");
+        assertThat(bootstrap.updatedBy()).isEqualTo("SYSTEM");
         new LocalAccountInitializer(users, encoder, "role-test-user", PASSWORD, UserRole.ADMIN).run(null);
         assertThat(users.findByUsername("role-test-user").orElseThrow().role()).isEqualTo(UserRole.USER);
         jdbc.update("DELETE FROM app_user WHERE username=?", "role-test-bootstrap");

@@ -12,9 +12,14 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class JdbcUserDao implements UserDao {
     private final JdbcTemplate jdbc;
+    private static final String COLUMNS = "id, username, password_hash, enabled, role, is_deleted, "
+            + "created_at, created_by, updated_at, updated_by";
     private static final RowMapper<UserAccount> ROW = (rs, row) -> new UserAccount(
             rs.getLong("id"), rs.getString("username"), rs.getString("password_hash"),
-            rs.getBoolean("enabled"), UserRole.valueOf(rs.getString("role")));
+            rs.getBoolean("enabled"), UserRole.valueOf(rs.getString("role")),
+            rs.getBoolean("is_deleted"),
+            rs.getTimestamp("created_at").toLocalDateTime(), rs.getString("created_by"),
+            rs.getTimestamp("updated_at").toLocalDateTime(), rs.getString("updated_by"));
 
     /**
      * 注入 JdbcTemplate，以参数化 SQL 查询和修改 app_user 表。
@@ -26,71 +31,78 @@ public class JdbcUserDao implements UserDao {
 
     /**
      * 按用户名查询账号，为登录认证和实时权限校验提供数据库数据。
-     * 返回值包含密码哈希，仅供内部使用。 SQL 使用占位符绑定用户名，避免 SQL 注入。
+     * 返回值包含密码哈希及删除状态，仅供内部使用；认证调用方必须拒绝已删除账号。
+     * 包含已删除账号以保留用户名占用状态；SQL 使用占位符绑定用户名，避免 SQL 注入。
      * @param username 要查询的用户名
      * @return 匹配的账号；不存在时返回 Optional.empty()
      */
     @Override
     public Optional<UserAccount> findByUsername(String username) {
         return jdbc.query(
-                "SELECT id, username, password_hash, enabled, role FROM app_user WHERE username = ?", ROW,
+                "SELECT " + COLUMNS + " FROM app_user WHERE username = ?", ROW,
                 username).stream().findFirst();
     }
 
     /**
-     * 新增启用的账号并保存指定身份；密码参数必须已完成哈希处理。
+     * 新增启用的账号并保存指定身份和审计信息；密码参数必须已完成哈希处理。
      * 用户名唯一性由数据库约束保证，权限检查和注册校验由调用方完成。
      * @param username 新用户名
      * @param passwordHash 已生成的密码哈希，禁止传入明文密码
      * @param role 新账号身份
+     * @param actor 后端确定的创建操作者，创建和初始修改用户均记录该值
      * @throws org.springframework.dao.DuplicateKeyException 用户名已存在
      */
     @Override
-    public void insert(String username, String passwordHash, UserRole role) {
-        jdbc.update("INSERT INTO app_user (username, password_hash, enabled, role) VALUES (?, ?, ?, ?)",
-                username, passwordHash, true, role.name());
+    public void insert(String username, String passwordHash, UserRole role, String actor) {
+        jdbc.update("INSERT INTO app_user (username, password_hash, enabled, role, "
+                + "created_at, created_by, updated_at, updated_by) "
+                + "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP(6), ?, CURRENT_TIMESTAMP(6), ?)",
+                username, passwordHash, true, role.name(), actor, actor);
     }
 
     /**
-     * 按数据库主键查询账号，供身份修改时确认目标用户。
+     * 按数据库主键查询未删除账号，供身份修改时确认目标用户。
      * @param id 账号数据库 ID
      * @return 匹配的内部账号；不存在时返回 Optional.empty()
      */
     @Override
     public Optional<UserAccount> findById(long id) {
-        return jdbc.query("SELECT id, username, password_hash, enabled, role FROM app_user WHERE id = ?",
+        return jdbc.query("SELECT " + COLUMNS + " FROM app_user WHERE id = ? AND is_deleted = FALSE",
                 ROW, id).stream().findFirst();
     }
 
     /**
-     * 按 ID 升序读取全部账号，包括禁用账号。
+     * 按 ID 升序读取所有未删除账号，包括禁用账号。
      * 结果包含密码哈希，仅供内部使用；调用方负责权限检查和响应字段过滤。
      * @return 全部内部账号列表，没有账号时为空列表
      */
     @Override
     public List<UserAccount> findAll() {
-        return jdbc.query("SELECT id, username, password_hash, enabled, role FROM app_user ORDER BY id", ROW);
+        return jdbc.query("SELECT " + COLUMNS + " FROM app_user WHERE is_deleted = FALSE ORDER BY id", ROW);
     }
 
     /**
-     * 查询并锁定所有启用的管理员记录，用于串行化管理员身份变更。
+     * 查询并锁定所有未删除且启用的管理员记录，用于串行化管理员身份变更。
      * 必须在事务内调用；锁持续到事务结束，避免并发请求把所有管理员都降级。
      * @return 按 ID 升序排列的启用管理员内部账号列表
      */
     @Override
     public List<UserAccount> lockEnabledAdmins() {
-        return jdbc.query("SELECT id, username, password_hash, enabled, role FROM app_user "
-                + "WHERE role = 'ADMIN' AND enabled = TRUE ORDER BY id FOR UPDATE", ROW);
+        return jdbc.query("SELECT " + COLUMNS + " FROM app_user "
+                + "WHERE role = 'ADMIN' AND enabled = TRUE AND is_deleted = FALSE ORDER BY id FOR UPDATE", ROW);
     }
 
     /**
-     * 根据账号 ID 更新数据库中的身份字段，不改变密码或启用状态。
+     * 根据账号 ID 更新身份，同时记录数据库当前时间和实际修改用户；保留创建信息。
      * 此方法只执行存储操作，权限检查、目标存在检查及最后管理员保护由业务层完成。
      * @param id 要修改的账号数据库 ID
      * @param role 要保存的新身份
+     * @param actor 后端认证的实际操作者用户名
      */
     @Override
-    public void updateRole(long id, UserRole role) {
-        jdbc.update("UPDATE app_user SET role = ? WHERE id = ?", role.name(), id);
+    public void updateRole(long id, UserRole role, String actor) {
+        jdbc.update("UPDATE app_user SET role = ?, updated_at = CURRENT_TIMESTAMP(6), updated_by = ? "
+                + "WHERE id = ? AND is_deleted = FALSE",
+                role.name(), actor, id);
     }
 }
