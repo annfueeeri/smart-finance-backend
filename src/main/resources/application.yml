@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: smart-finance-backend
+  profiles:
+    default: local
+  datasource:
+    druid:
+      validation-query: SELECT 1
+  jpa:
+    open-in-view: false
+  batch:
+    job:
+      enabled: false

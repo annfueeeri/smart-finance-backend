@@ -1,0 +1,18 @@
+openapi: 3.0.3
+info:
+  title: Smart Finance API
+  version: 0.0.1
+paths:
+  /api/health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      responses:
+        '200':
+          description: Application is running
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
