@@ -1,16 +1,17 @@
 package collector.bu.controller;
 
-import collector.bu.controller.api.UsersApi;
-import collector.bu.controller.model.Role;
-import collector.bu.controller.model.RoleUpdateRequest;
-import collector.bu.controller.model.UserSummary;
+import collector.bu.model.RoleUpdateRequest;
+import collector.bu.model.UserSummary;
 import collector.bu.entity.UserAccount;
-import collector.bu.entity.UserRole;
 import collector.bu.service.UserManagementService;
 import java.util.List;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -18,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 @RestController
 @RequestMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-public class UserManagementController implements UsersApi {
+public class UserManagementController {
     private final UserManagementService users;
 
     /**
@@ -33,7 +34,7 @@ public class UserManagementController implements UsersApi {
      * @return 用户基本信息及创建、修改审计信息，不含密码哈希
      */
     private UserSummary summary(UserAccount account) {
-        return new UserSummary(account.id(), account.username(), Role.fromValue(account.role().name()),
+        return new UserSummary(account.id(), account.username(), account.role(),
                 account.enabled(), account.createdAt().toString(), account.createdBy(),
                 account.updatedAt().toString(), account.updatedBy(), account.deleted(),
                 account.displayName(), account.email(), account.phone(), account.currency(), account.timezone(),
@@ -46,7 +47,6 @@ public class UserManagementController implements UsersApi {
      * 查询范围由业务层从数据库身份决定，禁止依赖前端过滤隐藏其他用户。
      * @return HTTP 200，返回当前账号可见的用户信息和审计字段
      */
-    @Override
     @GetMapping("/api/users")
     public ResponseEntity<List<UserSummary>> listVisibleUsers() {
         return ResponseEntity.ok(users.listVisibleUsers(SecurityContextHolder.getContext().getAuthentication().getName())
@@ -58,7 +58,6 @@ public class UserManagementController implements UsersApi {
      * 安全过滤器和业务层均检查管理员权限，响应中不包含密码哈希。
      * @return HTTP 200，返回用户摘要列表
      */
-    @Override
     @GetMapping("/api/admin/users")
     public ResponseEntity<List<UserSummary>> listUsers() {
         return ResponseEntity.ok(users.listUsers(SecurityContextHolder.getContext().getAuthentication().getName())
@@ -73,11 +72,12 @@ public class UserManagementController implements UsersApi {
      * @param body 新身份，仅允许 ADMIN 或 USER
      * @return HTTP 200，返回修改后的用户摘要
      */
-    @Override
     @PutMapping(value = "/api/admin/users/{id}/role", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<UserSummary> updateUserRole(Long id, String csrfToken, RoleUpdateRequest body) {
+    public ResponseEntity<UserSummary> updateUserRole(@PathVariable("id") Long id,
+            @RequestHeader(value = "X-CSRF-TOKEN", required = false) String csrfToken,
+            @Valid @RequestBody RoleUpdateRequest body) {
         return ResponseEntity.ok(summary(users.updateRole(
                 SecurityContextHolder.getContext().getAuthentication().getName(), id,
-                UserRole.valueOf(body.getRole().getValue()))));
+                body.role())));
     }
 }

@@ -1,11 +1,10 @@
 package collector.bu.controller;
 
-import collector.bu.controller.api.AuthApi;
-import collector.bu.controller.model.CsrfResponse;
-import collector.bu.controller.model.LoginRequest;
-import collector.bu.controller.model.RegisterRequest;
-import collector.bu.controller.model.Role;
-import collector.bu.controller.model.UserResponse;
+import collector.bu.model.CsrfResponse;
+import collector.bu.model.LoginRequest;
+import collector.bu.model.RegisterRequest;
+import collector.bu.entity.UserRole;
+import collector.bu.model.UserResponse;
 import collector.bu.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -16,6 +15,9 @@ import org.springframework.security.web.authentication.logout.SecurityContextLog
 import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfToken;
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,7 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 @RestController
 @RequestMapping(value = "/api/auth", produces = MediaType.APPLICATION_JSON_VALUE)
-public class AuthController implements AuthApi {
+public class AuthController {
     private final AuthService authService;
     private final HttpServletRequest request;
     private final HttpServletResponse response;
@@ -52,7 +54,6 @@ public class AuthController implements AuthApi {
      * 浏览器需同时保留会话 Cookie；登录成功后应重新获取令牌。
      * @return HTTP 200，响应包含 token、headerName 和 parameterName
      */
-    @Override
     @GetMapping("/csrf")
     public ResponseEntity<CsrfResponse> getCsrf() {
         var csrf = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
@@ -66,13 +67,14 @@ public class AuthController implements AuthApi {
      * @param body 独立的姓名、登录账号、可选联系邮箱与手机号、密码和确认密码
      * @return HTTP 201，返回新账号的用户名和 USER 身份
      */
-    @Override
     @PostMapping(value = "/register", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<UserResponse> register(String csrfToken, RegisterRequest body) {
-        authService.register(body.getUsername(), body.getPassword(), body.getConfirmPassword(),
-                body.getDisplayName(), body.getEmail(), body.getPhone(), body.getCurrency(), body.getTimezone(),
-                body.getMonthlyBudget(), body.getBudgetStartDay());
-        return ResponseEntity.status(201).body(new UserResponse(body.getUsername(), Role.USER));
+    public ResponseEntity<UserResponse> register(
+            @RequestHeader(value = "X-CSRF-TOKEN", required = false) String csrfToken,
+            @Valid @RequestBody RegisterRequest body) {
+        authService.register(body.username(), body.password(), body.confirmPassword(),
+                body.displayName(), body.email(), body.phone(), body.currency(), body.timezone(),
+                body.monthlyBudget(), body.budgetStartDay());
+        return ResponseEntity.status(201).body(new UserResponse(body.username(), UserRole.USER));
     }
 
     /**
@@ -82,10 +84,11 @@ public class AuthController implements AuthApi {
      * @param body 用户名和明文密码，仅用于此次认证
      * @return HTTP 200，返回用户名和身份；响应 Cookie 用于后续登录态识别
      */
-    @Override
     @PostMapping(value = "/login", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<UserResponse> login(String csrfToken, LoginRequest body) {
-        var authentication = authService.login(body.getUsername(), body.getPassword());
+    public ResponseEntity<UserResponse> login(
+            @RequestHeader(value = "X-CSRF-TOKEN", required = false) String csrfToken,
+            @Valid @RequestBody LoginRequest body) {
+        var authentication = authService.login(body.username(), body.password());
         sessions.onAuthentication(authentication, request, response);
         var context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(authentication);
@@ -99,7 +102,6 @@ public class AuthController implements AuthApi {
      * 数据库角色过滤器在此方法之前刷新身份，未登录请求由安全过滤器返回 401。
      * @return HTTP 200，返回当前用户名和身份
      */
-    @Override
     @GetMapping("/me")
     public ResponseEntity<UserResponse> getCurrentUser() {
         return ResponseEntity.ok(userResponse(SecurityContextHolder.getContext().getAuthentication()));
@@ -112,7 +114,7 @@ public class AuthController implements AuthApi {
      */
     private UserResponse userResponse(org.springframework.security.core.Authentication authentication) {
         var role = authentication.getAuthorities().stream()
-                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN")) ? Role.ADMIN : Role.USER;
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN")) ? UserRole.ADMIN : UserRole.USER;
         return new UserResponse(authService.currentUsername(authentication), role);
     }
 
@@ -122,9 +124,8 @@ public class AuthController implements AuthApi {
      * @param csrfToken 当前会话的 CSRF 请求头值，由安全过滤器预先校验
      * @return HTTP 204，没有响应体
      */
-    @Override
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(String csrfToken) {
+    public ResponseEntity<Void> logout(@RequestHeader(value = "X-CSRF-TOKEN", required = false) String csrfToken) {
         new SecurityContextLogoutHandler().logout(request, response,
                 SecurityContextHolder.getContext().getAuthentication());
         return ResponseEntity.noContent().build();

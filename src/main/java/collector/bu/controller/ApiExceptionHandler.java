@@ -1,6 +1,6 @@
 package collector.bu.controller;
 
-import collector.bu.controller.model.ErrorResponse;
+import collector.bu.model.ErrorResponse;
 import collector.bu.exception.RegistrationException;
 import collector.bu.exception.UserManagementException;
 import collector.bu.exception.LedgerException;

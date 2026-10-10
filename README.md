@@ -11,41 +11,28 @@ mvn verify
 mvn compile spring-boot:run
 ```
 
-Windows在仓库根目录运行 `start-local.cmd`，脚本先执行Maven生成和编译，再启动应用。
+Windows在仓库根目录运行 `start-local.cmd`，脚本先执行Maven编译，再启动应用。
 可附加Maven参数，例如 `start-local.cmd -Dspring-boot.run.profiles=mysql`；JDK仍使用17。
 
-### IDEA提示controller.model包不存在
+### IDEA 本地编译
 
-`collector.bu.controller.model`（ErrorResponse等）和`collector.bu.controller.api`由OpenAPI生成，
-位于 `target/generated-sources/openapi/src/main/java`，不会提交到Git；不要手动创建空包或修改import。
+运行需要的请求和响应模型均位于 `src/main/java/collector/bu/model`，已提交到 Git。
+Controller 直接声明路由、请求体、请求头、路径参数和参数校验，应用编译不依赖 OpenAPI 生成代码。
+拉取最新 main 后，在 IDEA 的 Maven 窗口点击 **Reload All Maven Projects**，
+项目 SDK 和 Maven Runner JRE 都选择 Java 17。也可执行 `mvn clean verify` 或运行 `start-local.cmd`。
 
-在Windows终端执行：
-
-```bat
-cd /d F:\GitRepository\smart-finance-backend
-mvn clean compile
-```
-
-确认生成 `target\generated-sources\openapi\src\main\java\collector\bu\controller\model\ErrorResponse.java`，
-再在IDEA的Maven窗口点击 **Reload All Maven Projects**。项目SDK和Maven Runner JRE都选择Java 17。
-打开Settings → Build, Execution, Deployment → Build Tools → Maven → Runner，
-启用 **Delegate IDE build/run actions to Maven**，让IDEA运行前也执行生成阶段。
-若IDE仍未识别源码目录，将 `target/generated-sources/openapi/src/main/java` 标记为 **Generated Sources Root**；
-标记包含collector目录的源码根，不能把model文件夹本身标记为根。
-也可直接使用 `start-local.cmd` 或 `mvn compile spring-boot:run`。
-
-POM显式绑定generate-sources并通过build-helper注册生成源码根。
-如果Maven生成步骤本身失败，应先修复该步骤报出的依赖下载/规范解析错误，再编译应用。
+如仍提示旧的 `collector.bu.controller.model` 或 `collector.bu.controller.api` 包不存在，
+先确认当前源码已更新且 import 指向 `collector.bu.model`，然后重新加载 Maven 项目并 Rebuild Project。
 
 默认 `local` profile 使用内存 H2（MySQL 兼容模式），无需数据库密码；进程退出后数据不保留。
 `GET /api/health` 返回 `{"status":"UP"}`。此接口仅检查 HTTP 服务，不代表外部服务健康。
 
-OpenAPI 定义位于 `src/main/resources/api.yaml`，接口在构建时生成到 `target/generated-sources/openapi`。
+OpenAPI 定义位于 `src/main/resources/api.yaml`，可用 `mvn -Popenapi-codegen generate-sources` 选择生成参考接口到 `target/generated-sources/openapi`。
 Controller 层也显式声明路由，便于直接查看：`AuthController` 的公共前缀为 `/api/auth`，
 方法使用 `@GetMapping` 或 `@PostMapping` 声明 `/csrf`、`/register`、`/login`、`/me`、`/logout`；
 `UserManagementController` 的方法分别显式声明 GET `/api/users`、GET `/api/admin/users` 和 PUT `/api/admin/users/{id}/role`；
 `HealthController` 声明 GET `/api/health`。完整路径由类前缀与方法路径组成。
-Controller 仍实现生成接口，参数绑定和校验约束来自接口定义。
+Controller 的参数绑定和校验显式定义在正式源码中，接口参数与规范保持一致。
 修改路径时需同时更新 OpenAPI 定义、JSON 文档及前端 `src/api/endpoints.ts`。
 模板目录已预留；未提供自定义模板时使用生成器默认模板。
 生成器启用 `useSpringBoot3` 以使用 Jakarta 命名空间；编译目标为 Java 17。
@@ -135,7 +122,7 @@ WHERE username = '指定的管理员用户名' AND enabled = TRUE AND is_deleted
 
 | 层 | 代码 | 职责 |
 | --- | --- | --- |
-| Controller | `controller/AuthController.java` | 实现生成的 AuthApi，接收请求、调用 Service、处理 Session 与响应 |
+| Controller | `controller/AuthController.java` | 显式声明认证路由和校验，接收请求、调用 Service、处理 Session 与响应 |
 | Service | `service/AuthService.java`、`service/impl/AuthServiceImpl.java`、`service/DatabaseUserDetailsService.java`、`service/impl/DatabaseUserDetailsServiceImpl.java` | 认证、密码与账号状态检查，通过 UserDao 加载账号 |
 | DAO | `dao/UserDao.java`、`dao/JdbcUserDao.java` | 参数化 SQL 查询和插入用户 |
 
@@ -213,7 +200,7 @@ Spring Batch 所需表仍需另行准备。
 ### 验证
 
 `mvn verify` 包含真实 HTTP 与数据库集成测试，覆盖登录、Cookie / Session 更换、当前用户、退出、
-未知 / 禁用账号、输入验证、CSRF 和 SQL 注入输入。OpenAPI 的认证接口和模型仍由 `api.yaml` 构建生成。
+未知 / 禁用账号、输入验证、CSRF 和 SQL 注入输入。认证接口和模型位于正式源码，OpenAPI 规范和 JSON 文档保持同步。
 
 ## 与前端联调
 
@@ -272,7 +259,7 @@ BACKEND_URL=http://127.0.0.1:18080 npm run dev
 金额最多 12 位整数，小数位不能超过币种精度（JPY/KRW 为 0，CNY/USD 为 2），
 以 BigDecimal 和 DECIMAL 保存，禁止浮点舍入。月度预算可以为 0；空值表示未设置预算。
 新增资料和偏好也返回在用户一览中，查询范围继续由管理员/一般用户身份决定。
-这些偏好为后续真实记账提供设置；资产总览仍为演示数据，真实收支模块按账户币种校验金额，但不会自动换算金额或生成预算报表。
+这些偏好为后续真实记账提供设置；资产总览仍为演示数据，真实收支模块按账户币种校验金额，不会自动换算币种；预算与财务报表由对应业务模块提供。
 
 已有 MySQL 在 V2、V3 完成后执行一次 `src/main/resources/db/migration/V4__add_user_profile_mysql.sql`。
 姓名暂回填为原账号，邮箱/手机号为空，偏好使用默认值，原主键、密码、身份及审计时间保持不变。
@@ -473,7 +460,7 @@ support/                    共享交易标签编解码，不执行SQL
 用户行锁统一由UserDao提供，同一用户并发流水、预算、转账、估值写入继续串行化。
 DAO保持参数化SQL、用户归属筛选、逻辑删除条件及审计字段；Controller只调用Service。
 本次仅重构Java包与职责，HTTP路径、参数、JSON文档和数据库结构不变，无需新增迁移。
-OpenAPI接口和模型仍由Maven生成到target/generated-sources/openapi，勿手动移动生成文件。
+OpenAPI参考接口和模型可通过openapi-codegen配置生成到target/generated-sources/openapi；应用不依赖生成目录，勿手动移动生成文件。
 
 
 ### Service与Impl一一对应
