@@ -8,8 +8,34 @@ Java 17 / Spring Boot 3.3.2 项目，依赖基于提供的 POM。
 
 ```sh
 mvn verify
-mvn spring-boot:run
+mvn compile spring-boot:run
 ```
+
+Windows在仓库根目录运行 `start-local.cmd`，脚本先执行Maven生成和编译，再启动应用。
+可附加Maven参数，例如 `start-local.cmd -Dspring-boot.run.profiles=mysql`；JDK仍使用17。
+
+### IDEA提示controller.model包不存在
+
+`collector.bu.controller.model`（ErrorResponse等）和`collector.bu.controller.api`由OpenAPI生成，
+位于 `target/generated-sources/openapi/src/main/java`，不会提交到Git；不要手动创建空包或修改import。
+
+在Windows终端执行：
+
+```bat
+cd /d F:\GitRepository\smart-finance-backend
+mvn clean compile
+```
+
+确认生成 `target\generated-sources\openapi\src\main\java\collector\bu\controller\model\ErrorResponse.java`，
+再在IDEA的Maven窗口点击 **Reload All Maven Projects**。项目SDK和Maven Runner JRE都选择Java 17。
+打开Settings → Build, Execution, Deployment → Build Tools → Maven → Runner，
+启用 **Delegate IDE build/run actions to Maven**，让IDEA运行前也执行生成阶段。
+若IDE仍未识别源码目录，将 `target/generated-sources/openapi/src/main/java` 标记为 **Generated Sources Root**；
+标记包含collector目录的源码根，不能把model文件夹本身标记为根。
+也可直接使用 `start-local.cmd` 或 `mvn compile spring-boot:run`。
+
+POM显式绑定generate-sources并通过build-helper注册生成源码根。
+如果Maven生成步骤本身失败，应先修复该步骤报出的依赖下载/规范解析错误，再编译应用。
 
 默认 `local` profile 使用内存 H2（MySQL 兼容模式），无需数据库密码；进程退出后数据不保留。
 `GET /api/health` 返回 `{"status":"UP"}`。此接口仅检查 HTTP 服务，不代表外部服务健康。
