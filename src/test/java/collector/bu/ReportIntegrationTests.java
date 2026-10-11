@@ -43,7 +43,7 @@ class ReportIntegrationTests {
     /** 按外键依赖清理本人财务测试数据，管理员保留独立身份验证隔离。 */
     @BeforeEach void setup(){
         for(var table:List.of("account_valuation","ledger_transfer","ledger_transaction","ledger_account","budget_notification","budget_adjustment","budget_plan","budget_template"))
-            jdbc.update("DELETE FROM "+table+" WHERE user_id IN (SELECT id FROM app_user WHERE username LIKE 'report-test-%')");
+            jdbc.update("DELETE FROM "+table+" WHERE book_id IN (SELECT id FROM app_user WHERE username LIKE 'report-test-%')");
         jdbc.update("DELETE FROM app_user WHERE username LIKE 'report-test-%'");users.insert(USER,encoder.encode(PASSWORD));users.insert(ADMIN,encoder.encode(PASSWORD),UserRole.ADMIN);
     }
     /** 创建具有明确期初余额的日元账户。 */
@@ -99,7 +99,7 @@ class ReportIntegrationTests {
     @Test void aggregateIncludesMoreThanTenThousandTransactions(){
         long id=account("Cash","CASH","0"),userId=users.findByUsername(USER).orElseThrow().id();
         var rows=new ArrayList<Object[]>();for(int i=0;i<10001;i++)rows.add(new Object[]{userId,id,"JPY","EXPENSE",1,LocalDate.of(2026,10,1),"FOOD",USER,USER});
-        jdbc.batchUpdate("INSERT INTO ledger_transaction(user_id,account_id,currency,kind,amount,transaction_date,category,created_by,updated_by) VALUES(?,?,?,?,?,?,?,?,?)",rows);
+        jdbc.batchUpdate("INSERT INTO ledger_transaction(book_id,account_id,currency,kind,amount,transaction_date,category,created_by,updated_by) VALUES(?,?,?,?,?,?,?,?,?)",rows);
         var summary=reports.report(USER,filter("2026-10-01","2026-10-01")).currencies().get(0).summary();assertThat(summary.expense()).isEqualTo("10001");assertThat(summary.expenseCount()).isEqualTo(10001);
     }
     /** 实际解码CSV、Excel和PDF，检查精确金额、原生图表、中文字体及完整分页明细。 */

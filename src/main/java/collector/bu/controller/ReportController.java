@@ -16,9 +16,9 @@ public class ReportController {
     private final ReportService service;private final ReportExportService exports;
     /** 注入财务统计业务与安全导出组件。 */
     public ReportController(ReportService service,ReportExportService exports) {this.service=service;this.exports=exports;}
-    /** 从认证会话获取用户名，不接受任何客户端用户ID。 */
+    /** 从认证会话获取用户名，不接受任何客户端账本ID。 */
     private String username(){return SecurityContextHolder.getContext().getAuthentication().getName();}
-    /** GET /api/reports/options：列出本人真实交易标签，供自定义筛选。 */
+    /** GET /api/reports/options：列出当前账本真实交易标签，供自定义筛选。 */
     @GetMapping("/api/reports/options")
     public ReportOptions options(){return service.options(username());}
     /** GET /api/reports/financial：指定周期、账户、方向、分类、标签和币种的全部财务统计。 */

@@ -29,25 +29,25 @@ public class BudgetController {
     /** PUT /api/budgets/{id}：调整金额、阈值和结转规则，保存前后金额与理由。 */
     @PutMapping("/api/budgets/{id}")
     public View adjust(@PathVariable long id,@Valid @RequestBody AdjustmentInput input) { return service.adjust(username(),id,input); }
-    /** GET /api/budgets/{id}/adjustments：查询本人预算调整和结转修改记录。 */
+    /** GET /api/budgets/{id}/adjustments：查询当前账本预算调整和结转修改记录。 */
     @GetMapping("/api/budgets/{id}/adjustments")
     public List<Adjustment> adjustments(@PathVariable long id) { return service.adjustments(username(),id); }
-    /** GET /api/budget-templates：本人保存的常用月度预算方案。 */
+    /** GET /api/budget-templates：当前账本保存的常用月度预算方案。 */
     @GetMapping("/api/budget-templates")
     public List<Template> templates() { return service.templates(username()); }
     /** POST /api/budget-templates：保存指定月份的总预算和分类配置为模板。 */
     @PostMapping("/api/budget-templates")
     public ResponseEntity<Template> saveTemplate(@Valid @RequestBody SaveTemplate input) { return ResponseEntity.status(201).body(service.saveTemplate(username(),input)); }
-    /** POST /api/budget-templates/{id}/apply：将本人模板应用到新月份，冲突时整批回滚。 */
+    /** POST /api/budget-templates/{id}/apply：将当前账本模板应用到新月份，冲突时整批回滚。 */
     @PostMapping("/api/budget-templates/{id}/apply")
     public List<View> apply(@PathVariable long id,@Valid @RequestBody ApplyTemplate input) { return service.applyTemplate(username(),id,input); }
-    /** POST /api/budgets/copy-month：复制本人上月或指定月份的预算配置。 */
+    /** POST /api/budgets/copy-month：复制当前账本上月或指定月份的预算配置。 */
     @PostMapping("/api/budgets/copy-month")
     public List<View> copy(@Valid @RequestBody CopyMonth input) { return service.copyMonth(username(),input); }
     /** GET /api/budget-notifications：最新个人站内预算阈值与超支提醒。 */
     @GetMapping("/api/budget-notifications")
     public List<Notice> notices() { return service.notices(username()); }
-    /** PUT /api/budget-notifications/{id}/read：把本人消息标记已读。 */
+    /** PUT /api/budget-notifications/{id}/read：把当前账本消息标记已读。 */
     @PutMapping("/api/budget-notifications/{id}/read")
     public ResponseEntity<Void> read(@PathVariable long id) { service.readNotice(username(),id);return ResponseEntity.noContent().build(); }
     /** GET /api/budgets/history：查看历史月度预算执行及长期超支分类，按币种分组。 */

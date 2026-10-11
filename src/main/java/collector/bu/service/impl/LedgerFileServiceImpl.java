@@ -23,6 +23,7 @@ import static collector.bu.model.LedgerModels.*;
 
 /** 解析 CSV、XLS 和 XLSX，提供无写入预览及安全导出，限制文件大小与行列数量。 */
 @Service
+@org.springframework.transaction.annotation.Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
 public class LedgerFileServiceImpl implements LedgerFileService {
     private final LedgerService service;
     private final ObjectMapper mapper;
@@ -161,7 +162,7 @@ public class LedgerFileServiceImpl implements LedgerFileService {
     private String safe(String value) {
         return !value.isEmpty() && "\'=+-@\t\r".indexOf(value.charAt(0))>=0 ? "'"+value : value;
     }
-    /** 生成含字段名的 UTF-8 BOM CSV 或 XLSX，可重新映射导入；只导出当前用户筛选数据。 */
+    /** 生成含字段名的 UTF-8 BOM CSV 或 XLSX，可重新映射导入；只导出当前账本筛选数据。 */
     @Override
     public byte[] export(String username,String format,String kind,LocalDate start,LocalDate end,Long accountId) {
         if (!format.equals("csv") && !format.equals("xlsx")) throw invalid();

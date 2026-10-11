@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Smart Finance API",
-    "version": "0.0.7",
-    "description": "Smart Finance uses a JSESSIONID cookie and CSRF protection.\nFirst GET /api/auth/csrf and retain its cookie. Send the returned token in\nX-CSRF-TOKEN for registration, login and logout. Registration creates an\naccount without signing in; log in separately and refresh CSRF after login.\n"
+    "version": "0.0.8",
+    "description": "Smart Finance uses a JSESSIONID cookie and CSRF protection.\nFirst GET /api/auth/csrf and retain its cookie. Send the returned token in\nX-CSRF-TOKEN for registration, login and logout. Registration creates an\naccount without signing in; log in separately and refresh CSRF after login.\nFinancial operations use the server-selected personal or family book.\nOptional X-BOOK-SCOPE (PERSONAL or FAMILY:<familyId>) rejects stale views with 409 BOOK_CHANGED.\nMembers share accounts, transactions, imports, transfers, budgets and reports; personal books remain private.\n"
   },
   "paths": {
     "/api/health": {
@@ -2329,6 +2329,653 @@
         },
         "description": "日期不得早于余额基准日期，年份1900至9998。同日最后id生效，保留旧记录审计；日终值覆盖当日及以前的全部流水，之后继续累计。不生成收支或预算消费，负余额计入负债。"
       }
+    },
+    "/api/family": {
+      "get": {
+        "tags": [
+          "Family"
+        ],
+        "operationId": "getFamily",
+        "summary": "查询当前账本和家庭成员",
+        "description": "通过当前会话检查成员/家庭管理员资格，与系统 ADMIN 身份独立。一个账号最多加入一个家庭。个人数据不迁入家庭。",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamilyStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Family"
+        ],
+        "operationId": "createFamily",
+        "summary": "创建独立家庭共享账本，返回邀请码",
+        "description": "通过当前会话检查成员/家庭管理员资格，与系统 ADMIN 身份独立。一个账号最多加入一个家庭。个人数据不迁入家庭。",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamilyInvitation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamilyCreate"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/family/join": {
+      "post": {
+        "tags": [
+          "Family"
+        ],
+        "operationId": "joinFamily",
+        "summary": "使用邀请码加入家庭并启用共享账本",
+        "description": "通过当前会话检查成员/家庭管理员资格，与系统 ADMIN 身份独立。一个账号最多加入一个家庭。个人数据不迁入家庭。",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamilyStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamilyJoin"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/family/scope": {
+      "put": {
+        "tags": [
+          "Family"
+        ],
+        "operationId": "selectFamilyScope",
+        "summary": "切换个人或家庭账本（对本账号全部会话生效）",
+        "description": "通过当前会话检查成员/家庭管理员资格，与系统 ADMIN 身份独立。一个账号最多加入一个家庭。个人数据不迁入家庭。",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamilyStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamilyScope"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/family/invitation": {
+      "post": {
+        "tags": [
+          "Family"
+        ],
+        "operationId": "rotateFamilyInvitation",
+        "summary": "家庭管理员轮换邀请码，旧码立即失效",
+        "description": "通过当前会话检查成员/家庭管理员资格，与系统 ADMIN 身份独立。一个账号最多加入一个家庭。个人数据不迁入家庭。",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamilyInvitation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/family/owner": {
+      "put": {
+        "tags": [
+          "Family"
+        ],
+        "operationId": "transferFamilyOwner",
+        "summary": "向家庭内启用成员移交家庭管理权",
+        "description": "通过当前会话检查成员/家庭管理员资格，与系统 ADMIN 身份独立。一个账号最多加入一个家庭。个人数据不迁入家庭。",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamilyStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamilyOwner"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/family/members/{userId}": {
+      "delete": {
+        "tags": [
+          "Family"
+        ],
+        "operationId": "removeFamilyMember",
+        "summary": "成员退出本人，或家庭管理员移除其他成员",
+        "description": "通过当前会话检查成员/家庭管理员资格，与系统 ADMIN 身份独立。一个账号最多加入一个家庭。个人数据不迁入家庭。",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamilyStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "参数、会话、家庭权限、成员不存在或状态冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -2382,6 +3029,216 @@
       }
     },
     "schemas": {
+      "FamilyMember": {
+        "type": "object",
+        "required": [
+          "userId",
+          "username",
+          "displayName",
+          "role",
+          "createdAt",
+          "createdBy",
+          "updatedAt",
+          "updatedBy",
+          "deleted"
+        ],
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "username": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "OWNER",
+              "MEMBER"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Family": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "currency",
+          "timezone",
+          "ownerUserId",
+          "members",
+          "createdAt",
+          "createdBy",
+          "updatedAt",
+          "updatedBy",
+          "deleted"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "ownerUserId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FamilyMember"
+            }
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FamilyStatus": {
+        "type": "object",
+        "required": [
+          "scope",
+          "family"
+        ],
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "PERSONAL",
+              "FAMILY"
+            ]
+          },
+          "family": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Family"
+              }
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "FamilyInvitation": {
+        "type": "object",
+        "required": [
+          "status",
+          "invitationCode"
+        ],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/FamilyStatus"
+          },
+          "invitationCode": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43,
+            "description": "256位随机邀请码，仅创建/轮换时显示。服务器只存哈希。"
+          }
+        }
+      },
+      "FamilyCreate": {
+        "type": "object",
+        "required": [
+          "name",
+          "currency",
+          "timezone"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "[A-Z]{3}"
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 64
+          }
+        }
+      },
+      "FamilyJoin": {
+        "type": "object",
+        "required": [
+          "invitationCode"
+        ],
+        "properties": {
+          "invitationCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        }
+      },
+      "FamilyScope": {
+        "type": "object",
+        "required": [
+          "scope"
+        ],
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "PERSONAL",
+              "FAMILY"
+            ]
+          }
+        }
+      },
+      "FamilyOwner": {
+        "type": "object",
+        "required": [
+          "userId"
+        ],
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      },
       "Role": {
         "type": "string",
         "enum": [

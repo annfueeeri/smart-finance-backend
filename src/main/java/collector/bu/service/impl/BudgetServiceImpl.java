@@ -4,28 +4,28 @@ import collector.bu.service.BudgetService;
 
 import collector.bu.exception.BudgetException;
 
-import collector.bu.dao.UserDao;
 import collector.bu.dao.BudgetDao;
 import collector.bu.dao.BudgetAdjustmentDao;
 import collector.bu.dao.BudgetTemplateDao;
 import collector.bu.dao.BudgetNotificationDao;
 import collector.bu.dao.TransactionDao;
-import collector.bu.entity.UserAccount;
+import collector.bu.model.BookContext;
 import collector.bu.model.LedgerCategory;
 import java.math.*;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import static collector.bu.model.BudgetModels.*;
 
-/** 计算个人预算执行、历史对比、结转及站内预警；所有金额按币种精确计算。 */
+/** 计算当前账本预算执行、历史对比、结转及站内预警；所有金额按币种精确计算。 */
 @Service
+@org.springframework.transaction.annotation.Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
 public class BudgetServiceImpl implements BudgetService {
-    private final UserDao users;
+    private final collector.bu.service.BookService books;
+    private final collector.bu.dao.BookDao bookDao;
     private final BudgetDao dao;
     private final BudgetAdjustmentDao adjustments;
     private final BudgetTemplateDao templates;
@@ -33,16 +33,16 @@ public class BudgetServiceImpl implements BudgetService {
     private final TransactionDao transactions;
     private final Clock clock;
     /** 注入用户访问、预算数据库组件，采用可替换时钟以验证跨月和时区边界。 */
-    public BudgetServiceImpl(UserDao users,BudgetDao dao,BudgetAdjustmentDao adjustments,BudgetTemplateDao templates,BudgetNotificationDao notifications,TransactionDao transactions,Clock clock) { this.users=users;this.dao=dao;this.adjustments=adjustments;this.templates=templates;this.notifications=notifications;this.transactions=transactions;this.clock=clock; }
+    public BudgetServiceImpl(collector.bu.service.BookService books,collector.bu.dao.BookDao bookDao,BudgetDao dao,BudgetAdjustmentDao adjustments,BudgetTemplateDao templates,BudgetNotificationDao notifications,TransactionDao transactions,Clock clock) { this.books=books;this.bookDao=bookDao;this.dao=dao;this.adjustments=adjustments;this.templates=templates;this.notifications=notifications;this.transactions=transactions;this.clock=clock; }
     /** 从数据库复查当前认证用户，不允许前端选择查询归属。 */
-    private UserAccount actor(String username) { return users.findByUsername(username).filter(u -> u.enabled() && !u.deleted()).orElseThrow(() -> new AccessDeniedException("Active account required")); }
+    private BookContext context(String username) { return books.resolve(username); }
     /** 将预算日期及可选分类交给流水DAO汇总，预算开始前消费为零，统计截止不超过预算结束日。 */
     private BigDecimal spent(Plan plan,LocalDate through) {
         var end=through.isBefore(plan.end()) ? through : plan.end();
-        return end.isBefore(plan.start()) ? BigDecimal.ZERO : transactions.spent(plan.userId(),plan.currency(),plan.start(),end,plan.category().equals("TOTAL") ? null : plan.category());
+        return end.isBefore(plan.start()) ? BigDecimal.ZERO : transactions.spent(plan.bookId(),plan.currency(),plan.start(),end,plan.category().equals("TOTAL") ? null : plan.category());
     }
-    /** 使用用户注册的时区读取今天，月底按用户当地日期结算。 */
-    private LocalDate today(UserAccount user) { return LocalDate.now(clock.withZone(ZoneId.of(user.timezone()))); }
+    /** 使用当前账本的时区读取今天，月底按用户当地日期结算。 */
+    private LocalDate today(BookContext book) { return LocalDate.now(clock.withZone(ZoneId.of(book.timezone()))); }
     /** 统一生成非法预算参数业务错误。 */
     private BudgetException invalid() { return new BudgetException("INVALID_BUDGET"); }
     /** 校验正数额度和币种精度，不容许数据库默默四舍五入。 */
@@ -60,12 +60,12 @@ public class BudgetServiceImpl implements BudgetService {
                 || (!period.equals("MONTH") && !rollover.equals("NONE")))throw invalid();
     }
     /** 校验总预算或支出分类及标准周期边界；自定义周期最长十年，起始日期限制在前后十年内。 */
-    private void validate(UserAccount user,Input input) {
+    private void validate(BookContext book,Input input) {
         amount(input.amount(),input.currency());settings(input.thresholds(),input.rolloverMode(),input.period()==null ? "" : input.period());
         try {
             if(input.name()==null || input.name().strip().isEmpty() || input.name().strip().length()>80 || input.start()==null || input.end()==null
-                    || input.end().isBefore(input.start()) || input.start().isBefore(today(user).minusYears(10))
-                    || input.end().isAfter(today(user).plusYears(10)) || ChronoUnit.DAYS.between(input.start(),input.end())>3660)throw invalid();
+                    || input.end().isBefore(input.start()) || input.start().isBefore(today(book).minusYears(10))
+                    || input.end().isAfter(today(book).plusYears(10)) || ChronoUnit.DAYS.between(input.start(),input.end())>3660)throw invalid();
             if(!input.category().equals("TOTAL") && !LedgerCategory.valueOf(input.category()).kind().equals("EXPENSE"))throw invalid();
             var start=input.start();var end=input.end();
             switch(input.period()) {
@@ -104,10 +104,10 @@ public class BudgetServiceImpl implements BudgetService {
                 && p.start().equals(start) && p.end().equals(end)).findFirst().orElse(null);
     }
     /** 按月份顺序修正结转链，可补建新月份；只结转一次不再次传递来源月份的余额，累计模式保留余额。 */
-    private void rollover(UserAccount user,LocalDate today) {
-        var plans=new ArrayList<>(dao.plans(user.id()));
+    private void rollover(BookContext book,LocalDate today) {
+        var plans=new ArrayList<>(dao.plans(book.id()));
         for(int i=0;i<plans.size();i++) {
-            var source=dao.plan(user.id(),plans.get(i).id());
+            var source=dao.plan(book.id(),plans.get(i).id());
             if(!source.period().equals("MONTH") || !source.end().isBefore(today))continue;
             var start=source.end().plusDays(1);var end=YearMonth.from(start).atEndOfMonth();var target=successor(plans,source,start,end);
             if(source.rolloverMode().equals("NONE") && (target==null || !Objects.equals(target.carryFromId(),source.id())))continue;
@@ -115,23 +115,32 @@ public class BudgetServiceImpl implements BudgetService {
             var carry=source.rolloverMode().equals("NONE") ? BigDecimal.ZERO : available.subtract(spent(source,source.end())).max(BigDecimal.ZERO);
             if(target==null) {
                 var input=new Input(source.name(),source.category(),source.currency(),"MONTH",start,end,money(source.amount(),source.currency()),source.thresholds(),source.rolloverMode());
-                target=dao.create(user.id(),"SYSTEM",input);plans.add(target);
+                target=dao.create(book.id(),"SYSTEM",input);plans.add(target);
                 plans.sort(Comparator.comparing(Plan::start).thenComparingLong(Plan::id));
             }
             if(target.carryFromId()!=null && !Objects.equals(target.carryFromId(),source.id()))throw new BudgetException("BUDGET_CONFLICT");
-            var current=dao.plan(user.id(),target.id());
+            var current=dao.plan(book.id(),target.id());
             if(current.carryIn().compareTo(carry)!=0 || !Objects.equals(current.carryFromId(),source.id())) {
                 adjustments.history(current,current.amount(),carry,"SYSTEM","月度结转，来源预算 #"+source.id()+"（补录历史支出时重新核算）");
                 dao.carry(current,source,carry,"SYSTEM");
             }
         }
     }
-    /** 刷新个人预算结转与站内预警，在收支提交事务中同步调用；同一阈值每周期只提示一次。 */
-    @Transactional
+    /** 刷新当前账本预算结转与站内预警，在收支提交事务中同步调用；同一阈值每周期只提示一次。 */
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     @Override
     public void refresh(String username) {
-        var user=actor(username);users.lockUser(user.id());var today=today(user);rollover(user,today);
-        for(var plan : dao.plans(user.id())) {
+        refreshContext(context(username));
+    }
+    /** 后台按账本独立刷新预算，不受任何成员当前账本选择影响。 */
+    @Override
+    public void refreshBook(long bookId) {
+        var context=bookDao.scheduled(bookId);if(context==null)return;bookDao.lock(bookId);refreshContext(context);
+    }
+    /** 在已经授权并锁定的账本内生成结转与去重预警。 */
+    private void refreshContext(BookContext book) {
+        var today=today(book);rollover(book,today);
+        for(var plan : dao.plans(book.id())) {
             if(today.isBefore(plan.start()) || today.isAfter(plan.end()))continue;
             var effective=plan.amount().add(plan.carryIn());var spent=spent(plan,plan.end());
             for(var threshold : plan.thresholds()) if(spent.multiply(BigDecimal.valueOf(100)).compareTo(effective.multiply(BigDecimal.valueOf(threshold)))>=0)
@@ -140,97 +149,97 @@ public class BudgetServiceImpl implements BudgetService {
         }
     }
     /** 查询个人指定日期范围预算，刷新结转后给出实时执行状态；不把注册月预算自动当作实际预算。 */
-    @Transactional
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     @Override
     public Overview overview(String username,LocalDate start,LocalDate end) {
-        var user=actor(username);if(start!=null && end!=null && start.isAfter(end))throw invalid();refresh(username);var today=today(user);
-        var items=dao.plans(user.id()).stream().filter(p -> (start==null || !p.end().isBefore(start)) && (end==null || !p.start().isAfter(end)))
+        var book=context(username);if(start!=null && end!=null && start.isAfter(end))throw invalid();refresh(username);var today=today(book);
+        var items=dao.plans(book.id()).stream().filter(p -> (start==null || !p.end().isBefore(start)) && (end==null || !p.start().isAfter(end)))
                 .map(p -> view(p,today)).toList();
-        return new Overview(items,today,user.currency(),user.monthlyBudget()==null ? "" : money(user.monthlyBudget(),user.currency()),notifications.unread(user.id()));
+        return new Overview(items,today,book.currency(),book.monthlyBudget()==null ? "" : money(book.monthlyBudget(),book.currency()),notifications.unread(book.id()));
     }
-    /** 新建个人预算，唯一范围冲突时返回 409，历史月度预算可以触发后续月份结转。 */
-    @Transactional
+    /** 新建当前账本预算，唯一范围冲突时返回 409，历史月度预算可以触发后续月份结转。 */
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     @Override
     public View create(String username,Input input) {
-        var user=actor(username);validate(user,input);users.lockUser(user.id());
-        try { var plan=dao.create(user.id(),username,input);refresh(username);return view(dao.plan(user.id(),plan.id()),today(user)); }
+        var book=context(username);validate(book,input);
+        try { var plan=dao.create(book.id(),username,input);refresh(username);return view(dao.plan(book.id(),plan.id()),today(book)); }
         catch(DuplicateKeyException e) { throw new BudgetException("BUDGET_CONFLICT"); }
     }
     /** 调整已有预算额度、阈值及结转策略，保存旧值和理由，并重新核算后续月份。 */
-    @Transactional
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     @Override
     public View adjust(String username,long id,AdjustmentInput input) {
-        var user=actor(username);users.lockUser(user.id());var plan=dao.plan(user.id(),id);amount(input.amount(),plan.currency());settings(input.thresholds(),input.rolloverMode(),plan.period());
+        var book=context(username);var plan=dao.plan(book.id(),id);amount(input.amount(),plan.currency());settings(input.thresholds(),input.rolloverMode(),plan.period());
         if(input.reason()==null || input.reason().strip().isEmpty() || input.reason().length()>300)throw invalid();
-        adjustments.history(plan,new BigDecimal(input.amount()),plan.carryIn(),username,input.reason());dao.adjust(plan,input,username);refresh(username);return view(dao.plan(user.id(),id),today(user));
+        adjustments.history(plan,new BigDecimal(input.amount()),plan.carryIn(),username,input.reason());dao.adjust(plan,input,username);refresh(username);return view(dao.plan(book.id(),id),today(book));
     }
-    /** 查询本人预算修改记录，先验证预算归属，禁止跨用户读取调整历史。 */
-    @Transactional(readOnly=true)
+    /** 查询当前账本预算修改记录，先验证预算归属，禁止跨账本读取调整历史。 */
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     @Override
-    public List<Adjustment> adjustments(String username,long id) { var user=actor(username);dao.plan(user.id(),id);return adjustments.adjustments(user.id(),id); }
+    public List<Adjustment> adjustments(String username,long id) { var book=context(username);dao.plan(book.id(),id);return adjustments.adjustments(book.id(),id); }
     /** 严格解析 YYYY-MM，拒绝无效年月与超出前后十年范围的月份。 */
-    private YearMonth month(UserAccount user,String text) {
+    private YearMonth month(BookContext book,String text) {
         try {
             if(text==null || !text.matches("[0-9]{4}-[0-9]{2}"))throw invalid();var value=YearMonth.parse(text);
-            if(value.atDay(1).isBefore(today(user).minusYears(10).withDayOfMonth(1)) || value.atEndOfMonth().isAfter(today(user).plusYears(10).withDayOfMonth(1).plusMonths(1).minusDays(1)))throw invalid();return value;
+            if(value.atDay(1).isBefore(today(book).minusYears(10).withDayOfMonth(1)) || value.atEndOfMonth().isAfter(today(book).plusYears(10).withDayOfMonth(1).plusMonths(1).minusDays(1)))throw invalid();return value;
         } catch(java.time.DateTimeException e) { throw invalid(); }
     }
-    /** 提取本人指定月份的全部月度配置，排除实际消费和结转数据。 */
-    private List<TemplateItem> items(UserAccount user,YearMonth month) {
-        var items=dao.plans(user.id()).stream().filter(p -> p.period().equals("MONTH") && YearMonth.from(p.start()).equals(month))
+    /** 提取当前账本指定月份的全部月度配置，排除实际消费和结转数据。 */
+    private List<TemplateItem> items(BookContext book,YearMonth month) {
+        var items=dao.plans(book.id()).stream().filter(p -> p.period().equals("MONTH") && YearMonth.from(p.start()).equals(month))
                 .map(p -> new TemplateItem(p.name(),p.category(),p.currency(),money(p.amount(),p.currency()),p.thresholds(),p.rolloverMode())).toList();
         if(items.isEmpty() || items.size()>50)throw invalid();return items;
     }
-    /** 把指定月份配置保存为本人常用模板，重复名称返回冲突。 */
-    @Transactional
+    /** 把指定月份配置保存为当前账本常用模板，重复名称返回冲突。 */
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     @Override
     public Template saveTemplate(String username,SaveTemplate input) {
-        var user=actor(username);users.lockUser(user.id());if(input.name()==null || input.name().strip().isEmpty() || input.name().length()>80)throw invalid();
-        try { return templates.saveTemplate(user.id(),username,input.name(),items(user,month(user,input.sourceMonth()))); }
+        var book=context(username);if(input.name()==null || input.name().strip().isEmpty() || input.name().length()>80)throw invalid();
+        try { return templates.saveTemplate(book.id(),username,input.name(),items(book,month(book,input.sourceMonth()))); }
         catch(DuplicateKeyException e) { throw new BudgetException("BUDGET_CONFLICT"); }
     }
-    /** 返回本人月度模板，管理员也不能读取其他人的预算方案。 */
-    @Transactional(readOnly=true)
+    /** 返回当前账本月度模板，管理员也不能读取其他账本的预算方案。 */
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     @Override
-    public List<Template> templates(String username) { return templates.templates(actor(username).id()); }
+    public List<Template> templates(String username) { return templates.templates(context(username).id()); }
     /** 原子应用一组月度配置，任何冲突或不合法配置都不允许留下部分预算。 */
-    private List<View> apply(UserAccount user,String username,YearMonth month,List<TemplateItem> items) {
-        users.lockUser(user.id());var created=new ArrayList<Long>();
+    private List<View> apply(BookContext book,String username,YearMonth month,List<TemplateItem> items) {
+        var created=new ArrayList<Long>();
         try {
             for(var item : items) {
                 var input=new Input(item.name(),item.category(),item.currency(),"MONTH",month.atDay(1),month.atEndOfMonth(),item.amount(),item.thresholds(),item.rolloverMode());
-                validate(user,input);created.add(dao.create(user.id(),username,input).id());
+                validate(book,input);created.add(dao.create(book.id(),username,input).id());
             }
         } catch(DuplicateKeyException e) { throw new BudgetException("BUDGET_CONFLICT"); }
-        refresh(username);return created.stream().map(id -> view(dao.plan(user.id(),id),today(user))).toList();
+        refresh(username);return created.stream().map(id -> view(dao.plan(book.id(),id),today(book))).toList();
     }
-    /** 将本人模板应用到目标月份，保留已有预算，冲突返回 409。 */
-    @Transactional
+    /** 将当前账本模板应用到目标月份，保留已有预算，冲突返回 409。 */
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     @Override
-    public List<View> applyTemplate(String username,long id,ApplyTemplate input) { var user=actor(username);return apply(user,username,month(user,input.month()),templates.template(user.id(),id).items()); }
+    public List<View> applyTemplate(String username,long id,ApplyTemplate input) { var book=context(username);return apply(book,username,month(book,input.month()),templates.template(book.id(),id).items()); }
     /** 将上月或其他月份的配置复制到新月份，不复制消费或重复增加结转余额。 */
-    @Transactional
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     @Override
     public List<View> copyMonth(String username,CopyMonth input) {
-        var user=actor(username);var source=month(user,input.sourceMonth());var target=month(user,input.targetMonth());if(source.equals(target))throw invalid();
-        users.lockUser(user.id());return apply(user,username,target,items(user,source));
+        var book=context(username);var source=month(book,input.sourceMonth());var target=month(book,input.targetMonth());if(source.equals(target))throw invalid();
+        return apply(book,username,target,items(book,source));
     }
-    /** 获取本人站内预警并刷新当前预算，保留原始通知时间与已读状态。 */
-    @Transactional
+    /** 获取当前账本站内预警并刷新当前预算，保留原始通知时间与已读状态。 */
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     @Override
-    public List<Notice> notices(String username) { refresh(username);return notifications.notices(actor(username).id()); }
-    /** 标记本人消息已读，审计用户为当前登录账号。 */
-    @Transactional
+    public List<Notice> notices(String username) { refresh(username);return notifications.notices(context(username).id()); }
+    /** 标记当前账本消息已读，审计用户为当前登录账号。 */
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     @Override
-    public void readNotice(String username,long id) { var user=actor(username);notifications.readNotice(user.id(),id,username); }
+    public void readNotice(String username,long id) { var book=context(username);notifications.readNotice(book.id(),id,username); }
     /** 分析已结束月度预算及分类超支频次，按分类与币种分组，不把总预算重复算入分类合计。 */
-    @Transactional
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     @Override
     public History history(String username,String from,String to) {
-        var user=actor(username);refresh(username);var today=today(user);
-        var first=from==null ? YearMonth.from(today).minusMonths(12) : month(user,from);var last=to==null ? YearMonth.from(today).minusMonths(1) : month(user,to);
+        var book=context(username);refresh(username);var today=today(book);
+        var first=from==null ? YearMonth.from(today).minusMonths(12) : month(book,from);var last=to==null ? YearMonth.from(today).minusMonths(1) : month(book,to);
         if(first.isAfter(last))throw invalid();
-        var views=dao.plans(user.id()).stream().filter(p -> p.period().equals("MONTH") && p.end().isBefore(today)
+        var views=dao.plans(book.id()).stream().filter(p -> p.period().equals("MONTH") && p.end().isBefore(today)
                 && !YearMonth.from(p.start()).isBefore(first) && !YearMonth.from(p.start()).isAfter(last)).map(p -> view(p,today)).toList();
         var groups=new TreeMap<String,List<View>>();for(var view : views)if(!view.category().equals("TOTAL"))groups.computeIfAbsent(view.category()+":"+view.currency(),k -> new ArrayList<>()).add(view);
         var categories=new ArrayList<CategoryHistory>();

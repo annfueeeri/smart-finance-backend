@@ -14,7 +14,7 @@ public final class BudgetModels {
             @NotBlank String amount,@NotNull @Size(min=1,max=10) List<@NotNull @Min(1) @Max(100) Integer> thresholds,
             @NotBlank String rolloverMode) { }
     /** 内部数据库预算，金额保持精确数值，计算后再转换为对外字符串。 */
-    public record Plan(long id,long userId,String name,String category,String currency,String period,LocalDate start,
+    public record Plan(long id,long bookId,String name,String category,String currency,String period,LocalDate start,
             LocalDate end,BigDecimal amount,List<Integer> thresholds,String rolloverMode,BigDecimal carryIn,Long carryFromId,
             LocalDateTime createdAt,String createdBy,LocalDateTime updatedAt,String updatedBy,boolean deleted) { }
     /** 预算执行信息，剩余可为负数；预测为线性外推，无支出天数不产生虚构消费。 */

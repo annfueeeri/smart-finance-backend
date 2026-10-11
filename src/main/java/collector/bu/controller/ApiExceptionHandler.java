@@ -15,6 +15,17 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    /** 将家庭管理错误转换为统一响应，不回显邀请码或其他家庭的数据。 */
+    @ExceptionHandler(collector.bu.exception.FamilyException.class)
+    public ResponseEntity<ErrorResponse> familyFailed(collector.bu.exception.FamilyException exception) {
+        var status=switch(exception.code()) {
+            case "FAMILY_NOT_FOUND", "FAMILY_MEMBER_NOT_FOUND" -> HttpStatus.NOT_FOUND;
+            case "ALREADY_IN_FAMILY", "FAMILY_FULL", "FAMILY_OWNER_REQUIRED", "BOOK_CHANGED" -> HttpStatus.CONFLICT;
+            default -> HttpStatus.BAD_REQUEST;
+        };
+        return ResponseEntity.status(status).body(new ErrorResponse(exception.code(),"家庭操作未完成，请检查邀请码、成员资格或先移交家庭管理权"));
+    }
+
     /** 将预算归属、参数和配置冲突分别转换为 404、400、409，不泄露内部 SQL。 */
     @ExceptionHandler(collector.bu.exception.BudgetException.class)
     public ResponseEntity<ErrorResponse> budgetFailed(collector.bu.exception.BudgetException exception) {

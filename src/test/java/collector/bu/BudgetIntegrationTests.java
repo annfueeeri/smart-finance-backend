@@ -36,9 +36,9 @@ class BudgetIntegrationTests {
     private static final String USER="budget-test-user",ADMIN="budget-test-admin",PASSWORD="Budget-testing-password-123";
     /** 清理独立预算测试数据库的业务数据，创建测试用户并冻结时间，避免跨月用例依赖真实日期。 */
     @BeforeEach void setup() {
-        for(var table : List.of("budget_notification","budget_adjustment","budget_template"))jdbc.update("DELETE FROM "+table+" WHERE user_id IN(SELECT id FROM app_user WHERE username LIKE 'budget-test-%')");
-        jdbc.update("UPDATE budget_plan SET carry_from_id=NULL WHERE user_id IN(SELECT id FROM app_user WHERE username LIKE 'budget-test-%')");
-        for(var table : List.of("budget_plan","ledger_transaction","ledger_account"))jdbc.update("DELETE FROM "+table+" WHERE user_id IN(SELECT id FROM app_user WHERE username LIKE 'budget-test-%')");
+        for(var table : List.of("budget_notification","budget_adjustment","budget_template"))jdbc.update("DELETE FROM "+table+" WHERE book_id IN(SELECT id FROM app_user WHERE username LIKE 'budget-test-%')");
+        jdbc.update("UPDATE budget_plan SET carry_from_id=NULL WHERE book_id IN(SELECT id FROM app_user WHERE username LIKE 'budget-test-%')");
+        for(var table : List.of("budget_plan","ledger_transaction","ledger_account"))jdbc.update("DELETE FROM "+table+" WHERE book_id IN(SELECT id FROM app_user WHERE username LIKE 'budget-test-%')");
         jdbc.update("DELETE FROM app_user WHERE username LIKE 'budget-test-%'");
         users.insert(USER,encoder.encode(PASSWORD));users.insert(ADMIN,encoder.encode(PASSWORD),UserRole.ADMIN);
         time("2026-10-09T00:00:00Z");

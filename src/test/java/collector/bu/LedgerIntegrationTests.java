@@ -36,8 +36,8 @@ class LedgerIntegrationTests {
     private static final String PASSWORD="Ledger-testing-password-123";
     /** 清理本套测试的流水、账户及账号，创建独立管理员和普通用户。 */
     @BeforeEach void setup() {
-        jdbc.update("DELETE FROM ledger_transaction WHERE user_id IN (SELECT id FROM app_user WHERE username LIKE 'ledger-test-%')");
-        jdbc.update("DELETE FROM ledger_account WHERE user_id IN (SELECT id FROM app_user WHERE username LIKE 'ledger-test-%')");
+        jdbc.update("DELETE FROM ledger_transaction WHERE book_id IN (SELECT id FROM app_user WHERE username LIKE 'ledger-test-%')");
+        jdbc.update("DELETE FROM ledger_account WHERE book_id IN (SELECT id FROM app_user WHERE username LIKE 'ledger-test-%')");
         jdbc.update("DELETE FROM app_user WHERE username LIKE 'ledger-test-%'");
         users.insert("ledger-test-user",encoder.encode(PASSWORD));
         users.insert("ledger-test-admin",encoder.encode(PASSWORD),UserRole.ADMIN);

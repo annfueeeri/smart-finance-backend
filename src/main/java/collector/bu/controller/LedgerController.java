@@ -13,16 +13,16 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import static collector.bu.model.LedgerModels.*;
 
-/** 个人收支接口，完整路径显式声明，写入请求由安全过滤器验证 CSRF。 */
+/** 当前账本收支接口，完整路径显式声明，写入请求由安全过滤器验证 CSRF。 */
 @RestController
 public class LedgerController {
     private final LedgerService service;
     private final LedgerFileService files;
-    /** 注入个人收支业务服务。 */
+    /** 注入当前账本收支业务服务。 */
     public LedgerController(LedgerService service,LedgerFileService files) { this.service=service; this.files=files; }
     /** 读取当前服务端认证用户名，不接受前端指定身份或用户 ID。 */
     private String username() { return SecurityContextHolder.getContext().getAuthentication().getName(); }
-    /** GET /api/ledger/options：加载个人账户、收入支出分类及默认记账日期。 */
+    /** GET /api/ledger/options：加载当前账本账户、收入支出分类及默认记账日期。 */
     @GetMapping("/api/ledger/options")
     public Options options() { return service.options(username()); }
     /** POST /api/accounts：创建个人收付款账户，成功返回 201 与审计信息。 */
@@ -30,7 +30,7 @@ public class LedgerController {
     public ResponseEntity<LedgerAccount> createAccount(@Valid @RequestBody AccountInput body) {
         return ResponseEntity.status(201).body(service.createAccount(username(),body));
     }
-    /** POST /api/transactions：新增工资、消费等个人收支，不接受其他人的账户。 */
+    /** POST /api/transactions：新增工资、消费等当前账本收支，不接受其他人的账户。 */
     @PostMapping("/api/transactions")
     public ResponseEntity<LedgerEntry> createEntry(@Valid @RequestBody EntryInput body) {
         return ResponseEntity.status(201).body(service.createEntry(username(),body));

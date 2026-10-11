@@ -9,15 +9,15 @@ public interface AccountingService {
     /** 保存账户资料并记录修改用户，同名同币种冲突返回409。 */
     LedgerAccount profile(String username,long id,AccountProfile input);
 
-    /** 原子保存本人同币种账户内部转账，拒绝同账户和跨用户转账，不生成收支或预算通知。 */
+    /** 原子保存当前账本同币种账户内部转账，拒绝同账户和跨账本转账，不生成收支或预算通知。 */
     Transfer transfer(String username,TransferInput input);
 
-    /** 查询本人内部转账，保留真实转账主键和审计信息。 */
+    /** 查询当前账本内部转账，保留真实转账主键和审计信息。 */
     List<Transfer> transfers(String username);
 
-    /** 新增本人账户日终余额/投资市值，必须不早于开户余额基准；旧值保留以支持历史曲线。 */
+    /** 新增当前账本账户日终余额/投资市值，必须不早于开户余额基准；旧值保留以支持历史曲线。 */
     Valuation value(String username,long id,ValuationInput input);
 
-    /** 返回本人某账户的全部余额校准历史，先验证账户归属。 */
+    /** 返回当前账本某账户的全部余额校准历史，先验证账户归属。 */
     List<Valuation> values(String username,long id);
 }

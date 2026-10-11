@@ -1,7 +1,7 @@
 -- 预算业务表统一包含主键、创建/修改用户和时间、逻辑删除标记。
 CREATE TABLE IF NOT EXISTS budget_plan (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
+    book_id BIGINT NOT NULL,
     name VARCHAR(80) NOT NULL,
     category VARCHAR(32) NOT NULL,
     currency VARCHAR(3) NOT NULL,
@@ -18,11 +18,11 @@ CREATE TABLE IF NOT EXISTS budget_plan (
     updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     updated_by VARCHAR(64) NOT NULL,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    CONSTRAINT fk_budget_user FOREIGN KEY (user_id) REFERENCES app_user(id),
-    CONSTRAINT uq_budget_owner UNIQUE (id,user_id),
-    CONSTRAINT uq_budget_scope_period UNIQUE (user_id,category,currency,period,start_date,end_date),
+    CONSTRAINT fk_budget_user FOREIGN KEY (book_id) REFERENCES ledger_book(id),
+    CONSTRAINT uq_budget_owner UNIQUE (id,book_id),
+    CONSTRAINT uq_budget_scope_period UNIQUE (book_id,category,currency,period,start_date,end_date),
     CONSTRAINT uq_budget_carry_source UNIQUE (carry_from_id),
-    CONSTRAINT fk_budget_carry_owner FOREIGN KEY (carry_from_id,user_id) REFERENCES budget_plan(id,user_id),
+    CONSTRAINT fk_budget_carry_owner FOREIGN KEY (carry_from_id,book_id) REFERENCES budget_plan(id,book_id),
     CONSTRAINT chk_budget_amount CHECK (amount>0 AND carry_in>=0),
     CONSTRAINT chk_budget_dates CHECK (start_date<=end_date),
     CONSTRAINT chk_budget_period CHECK (period IN ('MONTH','WEEK','QUARTER','YEAR','CUSTOM')),
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS budget_plan (
 );
 CREATE TABLE IF NOT EXISTS budget_adjustment (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
+    book_id BIGINT NOT NULL,
     budget_id BIGINT NOT NULL,
     old_amount DECIMAL(18,4) NOT NULL,
     new_amount DECIMAL(18,4) NOT NULL,
@@ -43,11 +43,11 @@ CREATE TABLE IF NOT EXISTS budget_adjustment (
     updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     updated_by VARCHAR(64) NOT NULL,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    CONSTRAINT fk_budget_adjustment_owner FOREIGN KEY (budget_id,user_id) REFERENCES budget_plan(id,user_id)
+    CONSTRAINT fk_budget_adjustment_owner FOREIGN KEY (budget_id,book_id) REFERENCES budget_plan(id,book_id)
 );
 CREATE TABLE IF NOT EXISTS budget_template (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
+    book_id BIGINT NOT NULL,
     name VARCHAR(80) NOT NULL,
     items_json TEXT NOT NULL,
     created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
@@ -55,12 +55,12 @@ CREATE TABLE IF NOT EXISTS budget_template (
     updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     updated_by VARCHAR(64) NOT NULL,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    CONSTRAINT fk_budget_template_user FOREIGN KEY (user_id) REFERENCES app_user(id),
-    CONSTRAINT uq_budget_template_name UNIQUE (user_id,name)
+    CONSTRAINT fk_budget_template_user FOREIGN KEY (book_id) REFERENCES ledger_book(id),
+    CONSTRAINT uq_budget_template_name UNIQUE (book_id,name)
 );
 CREATE TABLE IF NOT EXISTS budget_notification (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
+    book_id BIGINT NOT NULL,
     budget_id BIGINT NOT NULL,
     event_key VARCHAR(32) NOT NULL,
     message VARCHAR(500) NOT NULL,
@@ -70,6 +70,6 @@ CREATE TABLE IF NOT EXISTS budget_notification (
     updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     updated_by VARCHAR(64) NOT NULL,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    CONSTRAINT fk_budget_notification_owner FOREIGN KEY (budget_id,user_id) REFERENCES budget_plan(id,user_id),
+    CONSTRAINT fk_budget_notification_owner FOREIGN KEY (budget_id,book_id) REFERENCES budget_plan(id,book_id),
     CONSTRAINT uq_budget_notification_event UNIQUE (budget_id,event_key)
 );

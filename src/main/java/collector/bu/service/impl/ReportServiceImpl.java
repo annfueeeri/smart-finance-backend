@@ -23,6 +23,7 @@ import static collector.bu.model.ReportModels.*;
 
 /** 个人财务报表计算，币种分组、金额精确、收支与内部转账/非现金估值分别统计。 */
 @Service
+@org.springframework.transaction.annotation.Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
 public class ReportServiceImpl implements ReportService {
     private final LedgerService users;
     private final AccountDao accounts;
@@ -35,16 +36,16 @@ public class ReportServiceImpl implements ReportService {
     private record Data(List<LedgerAccount> accounts,List<Movement> movements,List<Transfer> transfers,List<Valuation> values) { }
     /** 注入用户验证、真实数据访问和时钟，默认周期按用户时区确定。 */
     public ReportServiceImpl(LedgerService users,AccountDao accounts,TransactionDao transactions,TransferDao transfers,AccountValuationDao valuations,ReportDao dao,Clock clock) { this.users=users;this.accounts=accounts;this.transactions=transactions;this.transfers=transfers;this.valuations=valuations;this.dao=dao;this.clock=clock; }
-    /** 将报表参数错误转成通用400，避免泄露实现或其他用户数据。 */
+    /** 将报表参数错误转成通用400，避免泄露实现或其他账本数据。 */
     private LedgerException invalid() { return new LedgerException(LedgerException.Reason.INVALID_REQUEST); }
     /** 完成默认日期、分组及筛选检查，日报最长366天，其他分组最长十年。 */
     private Filter filter(String username,Filter input) {
-        var user=users.actor(username);var today=LocalDate.now(clock.withZone(ZoneId.of(user.timezone())));
+        var book=users.context(username);var today=LocalDate.now(clock.withZone(ZoneId.of(book.timezone())));
         var start=input.start()==null ? today.withDayOfMonth(1) : input.start();var end=input.end()==null ? today : input.end();
         var grouping=input.grouping()==null ? "MONTH" : input.grouping();
         if(start.getYear()<1900 || end.getYear()>9998 || start.isAfter(end) || ChronoUnit.DAYS.between(start,end)>3660
                 || !Set.of("DAY","WEEK","MONTH","YEAR").contains(grouping) || (grouping.equals("DAY") && ChronoUnit.DAYS.between(start,end)>365))throw invalid();
-        if(input.accountId()!=null && accounts.account(user.id(),input.accountId()).isEmpty())throw new LedgerException(LedgerException.Reason.ACCOUNT_NOT_FOUND);
+        if(input.accountId()!=null && accounts.account(book.id(),input.accountId()).isEmpty())throw new LedgerException(LedgerException.Reason.ACCOUNT_NOT_FOUND);
         try {
             if(input.currency()!=null && Currency.getInstance(input.currency()).getDefaultFractionDigits()<0)throw invalid();
             if(input.kind()!=null && !Set.of("INCOME","EXPENSE").contains(input.kind()))throw invalid();
@@ -172,19 +173,19 @@ public class ReportServiceImpl implements ReportService {
         return new Comparison(start,end,change(current.income(),previous.income(),currency),change(current.expense(),previous.expense(),currency),change(current.net(),previous.net(),currency));
     }
     /** 获取当前用户全部真实标签作为自定义报表筛选候选。 */
-    @Transactional(readOnly=true)
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     @Override
-    public ReportOptions options(String username) { return new ReportOptions(transactions.tags(users.actor(username).id())); }
+    public ReportOptions options(String username) { return new ReportOptions(transactions.tags(users.context(username).id())); }
     /** 生成完整自定义财务报表，同一计算结果供页面、CSV、Excel和PDF共用。 */
-    @Transactional(readOnly=true)
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     @Override
     public Report report(String username,Filter input) {
-        var user=users.actor(username);var filter=filter(username,input);
-        var selectedAccounts=accounts.accounts(user.id()).stream().filter(a -> (filter.accountId()==null || filter.accountId()==a.id()) && (filter.currency()==null || filter.currency().equals(a.currency()))).toList();
+        var book=users.context(username);var filter=filter(username,input);
+        var selectedAccounts=accounts.accounts(book.id()).stream().filter(a -> (filter.accountId()==null || filter.accountId()==a.id()) && (filter.currency()==null || filter.currency().equals(a.currency()))).toList();
         var ids=selectedAccounts.stream().map(LedgerAccount::id).collect(java.util.stream.Collectors.toSet());
-        var rows=dao.movements(user.id(),filter.end()).stream().filter(m -> ids.contains(m.accountId())).toList();
-        var transferRows=transfers.transfers(user.id(),filter.end());var values=valuations.valuations(user.id(),filter.end());
-        var currencies=new TreeSet<String>();selectedAccounts.forEach(a -> currencies.add(a.currency()));if(currencies.isEmpty())currencies.add(filter.currency()==null ? user.currency() : filter.currency());
+        var rows=dao.movements(book.id(),filter.end()).stream().filter(m -> ids.contains(m.accountId())).toList();
+        var transferRows=transfers.transfers(book.id(),filter.end());var values=valuations.valuations(book.id(),filter.end());
+        var currencies=new TreeSet<String>();selectedAccounts.forEach(a -> currencies.add(a.currency()));if(currencies.isEmpty())currencies.add(filter.currency()==null ? book.currency() : filter.currency());
         var results=new ArrayList<CurrencyReport>();var points=points(filter);
         for(var currency : currencies) {
             var selected=selectedAccounts.stream().filter(a -> a.currency().equals(currency)).toList();var selectedIds=selected.stream().map(LedgerAccount::id).collect(java.util.stream.Collectors.toSet());

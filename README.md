@@ -493,3 +493,44 @@ DAO、entity、model、config、support同样直接放在各自层目录，已�
 JdbcUserDao移到dao根目录；service根目录与service/impl继续保留九组接口/实现对应关系。
 资源字体/许可、数据库迁移、测试、构建脚本及Maven管理的OpenAPI生成目录按其用途保留。
 Java包名、导入和README路径与实际文件位置一致，接口契约及数据库结构保持原样。
+
+## 家庭组与共享账本
+
+用户可以从侧边栏“家庭グループ”创建家庭，或使用家庭管理员分享的邀请码加入。
+一个账号最多属于一个家庭（最多50名成员），每个人保留独立个人账本。
+顶部“帳簿”选择器切换个人/家庭范围，选择保存在数据库，对该账号的全部会话生效。
+创建与加入家庭会自动选择家庭账本；原个人账户、流水和预算不会迁入或公开。
+
+所有成员共同使用家庭的账户、收支、CSV/Excel导入导出、转账、余额估值、预算、模板、
+预算站内提醒和财务报表。家庭使用创建时指定的默认币种、统一时区；账户仍可使用不同币种，金额不自动换汇。
+站内提醒及其已读状态属于共享账本，家庭成员共用。实际创建/修改用户名仍记录在每笔数据中。
+
+家庭管理员（OWNER）与系统管理员（ADMIN）身份独立。系统管理员不自动获得家庭财务数据权限。
+家庭管理员可重新生成邀请码、移除成员、向启用成员移交管理权；普通成员可退出。
+家庭管理员退出前必须先移交管理权；唯一成员不能退出自己的家庭，但可以切回个人账本。
+移除/退出后立刻恢复个人选择，原会话下一次请求也失去家庭访问权，已创建的共享记录保留。
+邀请码使用256位随机值，数据库仅保存SHA-256哈希，只在创建/重新生成的响应中展示原码；重新生成使旧码失效。
+
+新增正式源码遵循现有平铺结构：`controller/FamilyController.java`、`dao/FamilyDao.java`、
+`dao/BookDao.java`、`service/FamilyService.java`、`service/BookService.java`及对应`service/impl`实现。
+新增业务表family_group、family_member、ledger_book、book_preference均有主键、创建/修改时间与用户、是否删除字段。
+原财务表的归属列改为book_id，所有财务DAO仍绑定服务端授权的账本；复合外键禁止跨账本引用账户/预算。
+个人账本ID保留用户ID，家庭使用负家庭ID；这是服务端内部主键约定，客户端不能指定财务归属。
+财务请求使用READ_COMMITTED事务、用户锁和账本锁，使成员撤销、范围切换及共享写入串行化。
+后台预算任务按账本刷新，不受成员当前选择影响。
+
+前端财务请求附带X-BOOK-SCOPE（PERSONAL或FAMILY:<家庭ID>）。服务器发现页面范围已过期时返回409 BOOK_CHANGED，
+阻止多标签页切换后误写另一账本；前端重新读取选择并重建财务组件。
+旧数据外部客户端可以不提供该头，此时使用当前数据库选择；新客户端建议始终提供。
+
+完整接口：GET/POST `/api/family`、POST `/api/family/join`、PUT `/api/family/scope`、
+POST `/api/family/invitation`、PUT `/api/family/owner`、DELETE `/api/family/members/{userId}`。
+所有写操作要求当前会话CSRF令牌，接口JSON文档仍位于`docs/smart-finance-openapi.json`。
+
+**已有MySQL数据库升级**：先备份、停止应用写入，在V2–V7已完成的数据库执行一次
+[`V8__add_family_books_mysql.sql`](src/main/resources/db/migration/V8__add_family_books_mysql.sql)。
+DDL会隐式提交，脚本不能当作事务回滚或重复执行；不要仅升级Java代码而跳过迁移。
+脚本保留原个人记录、金额、主键及审计，并补建个人账本、迁移归属列及外键。
+新MySQL数据库：按schema-users、schema-family、schema-ledger、schema-budgets、schema-reports顺序创建当前结构，
+不要再执行旧版本迁移。local profile自动初始化最新H2结构。
+迁移回归在H2的MySQL兼容模式验证旧数据保留与外键，并仅适配H2不支持的多列ALTER/DROP FOREIGN KEY语法；未在真实MySQL实例执行。

@@ -1,0 +1,57 @@
+-- 家庭管理员独立于系统 ADMIN 身份；一个用户最多加入一个有效家庭。
+CREATE TABLE IF NOT EXISTS family_group (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ name VARCHAR(80) NOT NULL,
+ currency VARCHAR(3) NOT NULL,
+ timezone VARCHAR(64) NOT NULL,
+ owner_user_id BIGINT NOT NULL,
+ invitation_hash VARCHAR(64) NOT NULL UNIQUE,
+ created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+ created_by VARCHAR(64) NOT NULL,
+ updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+ updated_by VARCHAR(64) NOT NULL,
+ is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+ CONSTRAINT fk_family_owner FOREIGN KEY(owner_user_id) REFERENCES app_user(id)
+);
+CREATE TABLE IF NOT EXISTS family_member (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ family_id BIGINT NOT NULL,
+ user_id BIGINT NOT NULL,
+ active_user_id BIGINT UNIQUE,
+ created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+ created_by VARCHAR(64) NOT NULL,
+ updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+ updated_by VARCHAR(64) NOT NULL,
+ is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+ CONSTRAINT fk_family_member_group FOREIGN KEY(family_id) REFERENCES family_group(id),
+ CONSTRAINT fk_family_member_user FOREIGN KEY(user_id) REFERENCES app_user(id) ON DELETE CASCADE,
+ CONSTRAINT chk_family_member_active CHECK ((is_deleted=TRUE AND active_user_id IS NULL) OR (is_deleted=FALSE AND active_user_id IS NOT NULL AND active_user_id=user_id))
+);
+-- 正 ID 保留旧个人归属，负 ID 专用于家庭，两个空间永不冲突。
+CREATE TABLE IF NOT EXISTS ledger_book (
+ id BIGINT PRIMARY KEY,
+ owner_user_id BIGINT UNIQUE,
+ family_id BIGINT UNIQUE,
+ currency VARCHAR(3) NOT NULL,
+ timezone VARCHAR(64) NOT NULL,
+ created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+ created_by VARCHAR(64) NOT NULL,
+ updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+ updated_by VARCHAR(64) NOT NULL,
+ is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+ CONSTRAINT fk_book_user FOREIGN KEY(owner_user_id) REFERENCES app_user(id) ON DELETE CASCADE,
+ CONSTRAINT fk_book_family FOREIGN KEY(family_id) REFERENCES family_group(id),
+ CONSTRAINT chk_book_scope CHECK ((owner_user_id IS NOT NULL AND family_id IS NULL AND id=owner_user_id) OR (owner_user_id IS NULL AND family_id IS NOT NULL AND id=-family_id))
+);
+CREATE TABLE IF NOT EXISTS book_preference (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ user_id BIGINT NOT NULL UNIQUE,
+ scope VARCHAR(16) NOT NULL DEFAULT 'PERSONAL',
+ created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+ created_by VARCHAR(64) NOT NULL,
+ updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+ updated_by VARCHAR(64) NOT NULL,
+ is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+ CONSTRAINT fk_book_preference_user FOREIGN KEY(user_id) REFERENCES app_user(id) ON DELETE CASCADE,
+ CONSTRAINT chk_book_preference_scope CHECK(scope IN('PERSONAL','FAMILY'))
+);
