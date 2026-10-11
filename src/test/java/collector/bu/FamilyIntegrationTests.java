@@ -41,7 +41,7 @@ class FamilyIntegrationTests {
     /** 创建当前账本中的收付款账户，返回真实账户主键。 */
     private long account(Browser browser,String name) { var r=browser.send("/api/accounts",HttpMethod.POST,Map.of("name",name,"currency","JPY"));assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CREATED);return r.getBody().get("id").asLong(); }
     /** 构造一笔正数支出，不在请求中指定用户或账本归属。 */
-    private Map<String,Object> entry(long id,String amount) { return Map.of("accountId",id,"kind","EXPENSE","amount",amount,"date",LocalDate.now().toString(),"category","FOOD","merchant","Family store","note","Shared dinner","tags",List.of("家庭")); }
+    private Map<String,Object> entry(long id,String amount) { return Map.of("accountId",id,"kind","EXPENSE","amount",amount,"date",LocalDate.now(java.time.ZoneId.of("Asia/Tokyo")).toString(),"category","FOOD","merchant","Family store","note","Shared dinner","tags",List.of("家庭")); }
     /** 切换服务器持久化的当前账本。 */
     private void scope(Browser browser,String scope) { assertThat(browser.send("/api/family/scope",HttpMethod.PUT,Map.of("scope",scope)).getStatusCode()).isEqualTo(HttpStatus.OK); }
 
@@ -51,7 +51,7 @@ class FamilyIntegrationTests {
         assertThat(a.get("/api/ledger/options").getBody().get("accounts").size()).isZero();join(b,created);
         long first=account(a,"Shared cash"),second=account(b,"Shared bank");
         assertThat(a.get("/api/ledger/options").getBody().get("accounts").size()).isEqualTo(2);
-        var today=LocalDate.now();var budget=Map.of("name","Family food","category","FOOD","currency","JPY","period","MONTH","start",today.withDayOfMonth(1).toString(),"end",today.withDayOfMonth(today.lengthOfMonth()).toString(),"amount","100","thresholds",List.of(50,80,100),"rolloverMode","NONE");
+        var today=LocalDate.now(java.time.ZoneId.of("Asia/Tokyo"));var budget=Map.of("name","Family food","category","FOOD","currency","JPY","period","MONTH","start",today.withDayOfMonth(1).toString(),"end",today.withDayOfMonth(today.lengthOfMonth()).toString(),"amount","100","thresholds",List.of(50,80,100),"rolloverMode","NONE");
         assertThat(a.send("/api/budgets",HttpMethod.POST,budget).getStatusCode()).isEqualTo(HttpStatus.CREATED);
         var expense=b.send("/api/transactions",HttpMethod.POST,entry(first,"120"));assertThat(expense.getStatusCode()).isEqualTo(HttpStatus.CREATED);assertThat(expense.getBody().get("createdBy").asText()).isEqualTo(member);
         var list=a.get("/api/transactions").getBody();assertThat(list.get("total").asInt()).isEqualTo(1);assertThat(list.get("items").get(0).get("createdBy").asText()).isEqualTo(member);
@@ -117,7 +117,7 @@ class FamilyIntegrationTests {
     }
     /** 家庭成员并发记账不会丢失预算支出，去重预警只保存一次；后台不依赖当前选择。 */
     @Test void concurrentMemberExpensesAndScheduledRefreshShareOneBudget() throws Exception {
-        var a=new Browser(owner);var b=new Browser(member);var created=create(a);join(b,created);long cash=account(a,"Shared cash");var today=LocalDate.now();
+        var a=new Browser(owner);var b=new Browser(member);var created=create(a);join(b,created);long cash=account(a,"Shared cash");var today=LocalDate.now(java.time.ZoneId.of("Asia/Tokyo"));
         a.send("/api/budgets",HttpMethod.POST,Map.of("name","Concurrent budget","category","TOTAL","currency","JPY","period","MONTH","start",today.withDayOfMonth(1).toString(),"end",today.withDayOfMonth(today.lengthOfMonth()).toString(),"amount","100","thresholds",List.of(50),"rolloverMode","NONE"));
         var executor=Executors.newFixedThreadPool(2);
         try { var one=executor.submit(()->a.send("/api/transactions",HttpMethod.POST,entry(cash,"30")));var two=executor.submit(()->b.send("/api/transactions",HttpMethod.POST,entry(cash,"30")));assertThat(one.get(15,TimeUnit.SECONDS).getStatusCode()).isEqualTo(HttpStatus.CREATED);assertThat(two.get(15,TimeUnit.SECONDS).getStatusCode()).isEqualTo(HttpStatus.CREATED); }
