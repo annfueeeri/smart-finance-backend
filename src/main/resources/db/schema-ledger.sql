@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS ledger_transaction (
     updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     updated_by VARCHAR(64) NOT NULL,
     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT uq_ledger_transaction_owner UNIQUE (id,book_id),
     CONSTRAINT fk_ledger_transaction_user FOREIGN KEY (book_id) REFERENCES ledger_book(id),
     CONSTRAINT fk_ledger_transaction_account FOREIGN KEY (account_id, book_id) REFERENCES ledger_account(id, book_id),
     CONSTRAINT chk_ledger_transaction_amount CHECK (amount > 0),

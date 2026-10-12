@@ -15,6 +15,21 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    /** 返回明确的收据格式、大小、重复、数量或归属错误，文件内容不回显。 */
+    @ExceptionHandler(collector.bu.exception.ReceiptException.class)
+    public ResponseEntity<ErrorResponse> receiptFailed(collector.bu.exception.ReceiptException exception) {
+        var status=switch(exception.code()) {
+            case "RECEIPT_NOT_FOUND" -> HttpStatus.NOT_FOUND;
+            case "RECEIPT_DUPLICATE", "RECEIPT_LIMIT" -> HttpStatus.CONFLICT;
+            case "RECEIPT_TOO_LARGE" -> HttpStatus.PAYLOAD_TOO_LARGE;
+            default -> HttpStatus.BAD_REQUEST;
+        };
+        return ResponseEntity.status(status).body(new ErrorResponse(exception.code(),"收据格式、大小、数量或所属记录不符合要求"));
+    }
+    /** 超过服务器请求限制的文件返回413，供收据与流水导入画面提示。 */
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> uploadTooLarge() { return ResponseEntity.status(413).body(new ErrorResponse("RECEIPT_TOO_LARGE","文件超过上传大小限制")); }
+
     /** 将家庭管理错误转换为统一响应，不回显邀请码或其他家庭的数据。 */
     @ExceptionHandler(collector.bu.exception.FamilyException.class)
     public ResponseEntity<ErrorResponse> familyFailed(collector.bu.exception.FamilyException exception) {

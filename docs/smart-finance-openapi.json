@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Smart Finance API",
-    "version": "0.0.8",
+    "version": "0.0.9",
     "description": "Smart Finance uses a JSESSIONID cookie and CSRF protection.\nFirst GET /api/auth/csrf and retain its cookie. Send the returned token in\nX-CSRF-TOKEN for registration, login and logout. Registration creates an\naccount without signing in; log in separately and refresh CSRF after login.\nFinancial operations use the server-selected personal or family book.\nOptional X-BOOK-SCOPE (PERSONAL or FAMILY:<familyId>) rejects stale views with 409 BOOK_CHANGED.\nMembers share accounts, transactions, imports, transfers, budgets and reports; personal books remain private.\n"
   },
   "paths": {
@@ -2976,6 +2976,490 @@
           }
         ]
       }
+    },
+    "/api/transactions/{transactionId}/receipts": {
+      "get": {
+        "operationId": "listReceipts",
+        "tags": [
+          "Receipts"
+        ],
+        "summary": "查询流水收据元数据",
+        "description": "权限跟随当前个人/家庭账本。单文件最多5MB，每笔最多10份；图片最多2000万像素、单边10000，PDF最多50页且不能加密。文件内容存数据库，删除保留审计但不再允许访问。",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "transactionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "X-BOOK-SCOPE",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "PERSONAL 或 FAMILY:<家庭ID>，过期页面范围返回409。"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Receipt"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "uploadReceipt",
+        "tags": [
+          "Receipts"
+        ],
+        "summary": "上传JPG/PNG/PDF收据",
+        "description": "权限跟随当前个人/家庭账本。单文件最多5MB，每笔最多10份；图片最多2000万像素、单边10000，PDF最多50页且不能加密。文件内容存数据库，删除保留审计但不再允许访问。",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "transactionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "X-BOOK-SCOPE",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "PERSONAL 或 FAMILY:<家庭ID>，过期页面范围返回409。"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transactions/{transactionId}/receipts/{receiptId}/content": {
+      "get": {
+        "operationId": "downloadReceipt",
+        "tags": [
+          "Receipts"
+        ],
+        "summary": "经账本授权下载收据",
+        "description": "权限跟随当前个人/家庭账本。单文件最多5MB，每笔最多10份；图片最多2000万像素、单边10000，PDF最多50页且不能加密。文件内容存数据库，删除保留审计但不再允许访问。",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "transactionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "receiptId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "X-BOOK-SCOPE",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "PERSONAL 或 FAMILY:<家庭ID>，过期页面范围返回409。"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transactions/{transactionId}/receipts/{receiptId}": {
+      "delete": {
+        "operationId": "deleteReceipt",
+        "tags": [
+          "Receipts"
+        ],
+        "summary": "逻辑删除流水收据",
+        "description": "权限跟随当前个人/家庭账本。单文件最多5MB，每笔最多10份；图片最多2000万像素、单边10000，PDF最多50页且不能加密。文件内容存数据库，删除保留审计但不再允许访问。",
+        "security": [
+          {
+            "sessionAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "transactionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "receiptId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "X-BOOK-SCOPE",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "PERSONAL 或 FAMILY:<家庭ID>，过期页面范围返回409。"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "成功"
+          },
+          "400": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "无权限、不存在、格式不合法、重复、达到数量限制或超出文件大小",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3029,6 +3513,62 @@
       }
     },
     "schemas": {
+      "Receipt": {
+        "type": "object",
+        "required": [
+          "id",
+          "transactionId",
+          "fileName",
+          "contentType",
+          "fileSize",
+          "createdAt",
+          "createdBy",
+          "updatedAt",
+          "updatedBy",
+          "deleted"
+        ],
+        "properties": {
+          "fileName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "transactionId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fileSize": {
+            "type": "integer",
+            "format": "int64",
+            "maximum": 5242880
+          },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "application/pdf"
+            ]
+          },
+          "deleted": {
+            "type": "boolean"
+          }
+        }
+      },
       "FamilyMember": {
         "type": "object",
         "required": [

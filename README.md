@@ -534,3 +534,24 @@ DDL会隐式提交，脚本不能当作事务回滚或重复执行；不要仅�
 新MySQL数据库：按schema-users、schema-family、schema-ledger、schema-budgets、schema-reports顺序创建当前结构，
 不要再执行旧版本迁移。local profile自动初始化最新H2结构。
 迁移回归在H2的MySQL兼容模式验证旧数据保留与外键，并仅适配H2不支持的多列ALTER/DROP FOREIGN KEY语法；未在真实MySQL实例执行。
+
+## 流水收据上传
+
+在收支明细每笔记录的“領収書”按钮打开收据管理。支持JPG、PNG与非加密PDF，单份最多5MB，
+每笔最多10份有效附件；图片最多2000万像素、单边10000像素，PDF最多50页。
+服务器解码并检查实际内容，不仅检查扩展名或浏览器Content-Type。同一流水重复文件返回409。
+可以查看图片、下载全部格式、删除附件；PDF作为下载提供，不嵌入应用执行。
+
+收据二进制与元数据保存在transaction_receipt数据库表，和流水、账户一样按当前账本授权。
+家庭成员可共同管理家庭收据，系统ADMIN没有跨账本权限；退出/移除家庭后的旧会话不能继续读取、上传或删除。
+文件不暴露公共静态URL；响应禁止缓存，前端经认证请求后使用临时Blob URL，并在关闭预览时释放。
+不依赖MinIO或本地绝对路径。MySQL保存持久数据，备份时需包含BLOB；local内存H2退出后仍会丢失数据。
+删除为逻辑删除，保留二进制及完整创建/修改用户和时间审计；删除文件不再出现在普通接口或允许下载。
+上传只关联已有流水，不修改金额、分类、预算，也不会自动识别票面内容。
+
+新增平铺ReceiptController、ReceiptDao、ReceiptService及service/impl/ReceiptServiceImpl，所有新增方法含中文注释。
+新增业务表包含主键、创建时间/用户、修改时间/用户及是否删除字段，并使用流水/账本复合外键。
+已有MySQL在V8后先备份并执行一次[`V9__add_transaction_receipts_mysql.sql`](src/main/resources/db/migration/V9__add_transaction_receipts_mysql.sql)。
+新数据库在现有最新schema后执行schema-receipts.sql；local自动初始化。
+完整接口文档已更新到docs/smart-finance-openapi.json：GET/POST /api/transactions/{transactionId}/receipts、
+GET /api/transactions/{transactionId}/receipts/{receiptId}/content、DELETE /api/transactions/{transactionId}/receipts/{receiptId}。
